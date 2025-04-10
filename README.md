@@ -1,6 +1,6 @@
 # User-centric Remote Sensing Analysis (URSA) based on Large Language Models
 
-> Towards the Future of Remote Sensing Analysis with AI-driven Multi-Agent Collaboration.
+> Towards the Future of Remote Sensing Analysis with state-of-the-art AI technology.
 
 ---
 
