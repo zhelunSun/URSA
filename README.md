@@ -12,7 +12,7 @@
 
 ## ✨ Highlights
 
-Remote sensing analysis transforms remotely sensed data into actionable information across various domains. Nonetheless, conventional data-centric methodologies establish barriers between remote sensing data and downstream users possessing limited expertise in the field. *User-Centric Remote Sensing Analysis (URSA)* framework aims to explore a new paradigm of remote sensing analysis leveraging state-of-the-art Large Language Models (LLMs). It enables human users to directly express their needs in natural language without technical barriers, while LLM-powered AI agents can understand the needs and perform according RS analysis pipeline fully automatically and return interpretable results.
+Remote sensing analysis transforms remotely sensed data into actionable information across various domains. Nonetheless, conventional data-centric methodologies establish barriers between remote sensing data and downstream users possessing limited expertise in the field. *User-Centric Remote Sensing Analysis (URSA)* framework aims to explore new possibilities of remote sensing analysis leveraging state-of-the-art Large Language Models (LLMs). It enables human users to directly express their needs in natural language without technical barriers, while LLM-powered AI agents can understand the needs and perform according RS analysis pipeline fully automatically and return interpretable results.
 ![URSA main](/assets/img/1Paradgim_trans_00.jpg "Conceptual Graph")
 URSA paves the way towards more accessible, interactive, and intelligent remote sensing analysis in the future.
 
