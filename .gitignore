@@ -30,6 +30,9 @@ results/
 .test_tmp/
 tmp*/
 
+# Local agent notes (private, not for public GitHub)
+.agent/
+
 # OS
 .DS_Store
 Thumbs.db
