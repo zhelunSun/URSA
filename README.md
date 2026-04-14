@@ -5,7 +5,8 @@
 ---
 
 ## 🗞️ News
-- **May 20, 2025** — Our paper entitled [Achieving user-centric remote sensing analysis through an LLM-based multi-agent system](https://github.com/zhelunSun/URSA) is under review
+- **Jan 08, 2026** — Our paper [An LLM-based multi-agent system for remote sensing analysis](https://www.tandfonline.com/doi/full/10.1080/20964471.2025.2600178) was published online in *Big Earth Data*.
+- **May 20, 2025** — Our paper was submitted for review.
 - **Nov 30, 2024** — Our early work was presented at [The 1st International Workshop on Remote Sensing Intelligent Mapping (RSIM)](https://www.geog-event.hku.hk/rsim)
 
 ---
@@ -31,4 +32,9 @@ ExpertsRS is built based on [AutoGen](https://github.com/microsoft/autogen), and
 
 ---
 
+## 📄 Citation
+
+If you use URSA or ExpertsRS in your work, please cite:
+
+> Sun, Z., Zhou, Y., & Yang, J. (2026). An LLM-based multi-agent system for remote sensing analysis. *Big Earth Data*. https://doi.org/10.1080/20964471.2025.2600178
 
