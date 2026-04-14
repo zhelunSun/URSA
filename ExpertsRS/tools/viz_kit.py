@@ -287,9 +287,9 @@ def plot_false_color_composite(file_path: str = None,
             file_path = _resolve_data_path(None)
 
         with rasterio.open(file_path) as src:
-            nir = src.read(nir_band - 1).astype(np.float32)
-            red = src.read(red_band - 1).astype(np.float32)
-            green = src.read(green_band - 1).astype(np.float32)
+            nir = src.read(nir_band).astype(np.float32)
+            red = src.read(red_band).astype(np.float32)
+            green = src.read(green_band).astype(np.float32)
             bounds = _get_geo_bounds(src)
             nodata = src.nodata
 

@@ -26,6 +26,10 @@ results/
 *.jpg
 *.png
 
+# Local test scratch space
+.test_tmp/
+tmp*/
+
 # OS
 .DS_Store
 Thumbs.db

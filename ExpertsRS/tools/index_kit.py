@@ -23,13 +23,13 @@ def _get_timestamp() -> str:
 
 def _load_two_bands(file_path: str, band_a: int, band_b: int):
     """Load two bands from a raster file. Returns (arr_a, arr_b, profile).
-    
-    band_a and band_b are 1-based (matching the public tool interface).
-    Convert to 0-based for rasterio src.read().
+
+    band_a and band_b are 1-based, matching both the public tool interface
+    and rasterio's band indexing.
     """
     with rasterio.open(file_path) as src:
-        arr_a = src.read(band_a - 1).astype(np.float32)
-        arr_b = src.read(band_b - 1).astype(np.float32)
+        arr_a = src.read(band_a).astype(np.float32)
+        arr_b = src.read(band_b).astype(np.float32)
         profile = src.profile.copy()
     return arr_a, arr_b, profile
 
@@ -156,9 +156,9 @@ def calculate_evi(file_path: str = None, nir_band: int = 8,
     try:
         abs_path = _resolve_data_path(file_path)
         with rasterio.open(abs_path) as src:
-            arr_nir = src.read(nir_band - 1).astype(np.float32)
-            arr_red = src.read(red_band - 1).astype(np.float32)
-            arr_blue = src.read(blue_band - 1).astype(np.float32)
+            arr_nir = src.read(nir_band).astype(np.float32)
+            arr_red = src.read(red_band).astype(np.float32)
+            arr_blue = src.read(blue_band).astype(np.float32)
             profile = src.profile.copy()
 
         nodata = profile.get("nodata")
@@ -297,7 +297,7 @@ def calculate_lst(file_path: str = None, thermal_band: int = 10,
                     "message": f"Thermal band {thermal_band} out of range (1-{src.count}).",
                     "data": None
                 }
-            arr = src.read(thermal_band - 1).astype(np.float64)
+            arr = src.read(thermal_band).astype(np.float64)
             profile = src.profile.copy()
 
         nodata = profile.get("nodata")

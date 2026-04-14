@@ -2,9 +2,10 @@
 # Standardized remote sensing toolkits for LLM agents
 #
 # Usage:
-#   from tools import get_all_tools, get_tool_schemas
+#   from tools import get_all_tools, get_tool_schemas, print_tool_catalog
 #   tools = get_all_tools()              # list of function definitions
 #   schemas = get_tool_schemas()         # OpenAI function_call schemas
+#   print_tool_catalog()                 # readable catalog
 #
 # Tool kits:
 #   - io_kit       : Raster I/O, band extraction, metadata
@@ -12,6 +13,6 @@
 #   - analysis_kit : Thresholding, area stats, masking
 #   - viz_kit      : Thematic maps, heatmaps
 
-from .registry import get_all_tools, get_tool_schemas, list_tools
+from .registry import get_all_tools, get_tool_schemas, list_tools, print_tool_catalog
 
-__all__ = ["get_all_tools", "get_tool_schemas", "list_tools"]
+__all__ = ["get_all_tools", "get_tool_schemas", "list_tools", "print_tool_catalog"]

@@ -174,7 +174,6 @@ def read_raster_band(file_path: str = None, band_index: int = 1) -> dict:
     try:
         abs_path = _resolve_data_path(file_path)
         with rasterio.open(abs_path) as src:
-            # Convert 1-based band_index to 0-based for rasterio
             if band_index < 1 or band_index > src.count:
                 return {
                     "success": False,
@@ -182,7 +181,7 @@ def read_raster_band(file_path: str = None, band_index: int = 1) -> dict:
                                f"File has {src.count} band(s). Use band_index 1 to {src.count}.",
                     "data": None
                 }
-            arr = src.read(band_index - 1)  # Convert 1-based (user input) to 0-based (rasterio)
+            arr = src.read(band_index)
             stats = {
                 "array_shape": arr.shape,
                 "dtype": str(arr.dtype),
@@ -242,8 +241,7 @@ def read_raster_bands(file_path: str = None, band_indices: list[int] = None) -> 
                             "data": None
                         }
                 bands = band_indices
-            # Read all requested bands (0-based internally)
-            arrays = [src.read(b - 1) for b in bands]
+            arrays = [src.read(b) for b in bands]
             shape = arrays[0].shape
         return {
             "success": True,

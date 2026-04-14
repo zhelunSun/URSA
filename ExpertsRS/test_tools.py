@@ -78,6 +78,49 @@ except Exception as e:
     failed += 1
 
 # ── 6. index_kit — check formulas ───────────────────────────────
+# Regression test: rasterio uses 1-based band indexes, matching our public API.
+try:
+    import numpy as np
+    import rasterio
+    from rasterio.transform import from_origin
+    from tools.io_kit import read_raster_band, read_raster_bands
+
+    tmp_dir = os.path.join(os.path.dirname(__file__), ".test_tmp")
+    os.makedirs(tmp_dir, exist_ok=True)
+    test_raster = os.path.join(tmp_dir, "band_indexing.tif")
+    try:
+        profile = {
+            "driver": "GTiff",
+            "height": 2,
+            "width": 2,
+            "count": 2,
+            "dtype": "float32",
+            "crs": None,
+            "transform": from_origin(0, 2, 1, 1),
+        }
+        with rasterio.open(test_raster, "w", **profile) as dst:
+            dst.write(np.full((2, 2), 11, dtype=np.float32), 1)
+            dst.write(np.full((2, 2), 22, dtype=np.float32), 2)
+
+        first = read_raster_band(test_raster, 1)
+        second = read_raster_band(test_raster, 2)
+        both = read_raster_bands(test_raster, [1, 2])
+
+        assert first["success"] and first["data"]["min"] == 11.0
+        assert second["success"] and second["data"]["min"] == 22.0
+        assert both["success"] and both["data"]["bands_read"] == [1, 2]
+    finally:
+        if os.path.exists(test_raster):
+            os.remove(test_raster)
+        if os.path.isdir(tmp_dir) and not os.listdir(tmp_dir):
+            os.rmdir(tmp_dir)
+
+    print(f"[PASS] raster band indexing uses 1-based rasterio bands correctly")
+    passed += 1
+except Exception as e:
+    print(f"[FAIL] raster band indexing regression test: {e}")
+    failed += 1
+
 from tools.index_kit import calculate_ndvi
 if calculate_ndvi.__doc__ and "NDVI" in calculate_ndvi.__doc__:
     print(f"[PASS] calculate_ndvi docstring present")

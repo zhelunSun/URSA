@@ -114,4 +114,13 @@ URSA/
 | `tools/registry.py` | AutoGen function_map + OpenAI function_call schema registration |
 | `prompts.py` | Engineer prompt fully refactored, tool-first |
 | `ExpertsRS_notebook.ipynb` | New tool loading cell, Engineer registers function_map |
-| `test_tools.py` | Tool module validation (12/12 pass) |
+| `test_tools.py` | Tool module validation (13/13 pass, including band indexing regression) |
+
+### Phase 1.1 - Stability Fixes ✅
+
+| File | Change |
+|------|--------|
+| `tools/io_kit.py`, `tools/index_kit.py`, `tools/viz_kit.py` | Fixed rasterio band reads to use 1-based indexes consistently |
+| `tools/__init__.py` | Exported `print_tool_catalog` for notebook imports |
+| `.gitattributes` | Restricted Git LFS tracking to large raster/image/archive formats |
+| `.env.example` | Fixed DeepSeek base URL typo |
