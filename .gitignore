@@ -32,6 +32,7 @@ tmp*/
 
 # Local agent notes (private, not for public GitHub)
 .agent/
+upgrade_progress.md
 
 # OS
 .DS_Store
