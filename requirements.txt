@@ -1,0 +1,39 @@
+# Core dependencies for ExpertsRS / URSA framework
+# Install with: pip install -r requirements.txt
+
+# AutoGen multi-agent framework
+autogen-agentchat>=0.2
+autogen-ext[openai]>=0.4
+
+# LLM providers
+openai>=1.0
+anthropic>=0.18
+requests>=2.31
+
+# Geospatial data processing
+rasterio>=1.3
+geopandas>=0.14
+GDAL>=3.8
+shapely>=2.0
+pyproj>=3.6
+
+# Scientific computing
+numpy>=1.24
+pandas>=2.0
+scipy>=1.11
+
+# Visualization
+matplotlib>=3.7
+contextily>=1.3
+folium>=0.15
+
+# Environment management
+python-dotenv>=1.0
+
+# Earth Engine (optional — Phase 2)
+# earthengine-api>=0.1
+# eeextra>=1.0
+
+# Notebook
+jupyter>=1.0
+ipykernel>=6.0

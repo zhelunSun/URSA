@@ -1,0 +1,35 @@
+# Environment variables (NEVER commit these)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Results (generated at runtime)
+results/
+*.tif
+*.jpg
+*.png
+
+# OS
+.DS_Store
+Thumbs.db
+
+# GEE credentials (if used)
+*.json
+earthengine
