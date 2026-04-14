@@ -32,6 +32,26 @@ ExpertsRS is built based on [AutoGen](https://github.com/microsoft/autogen), and
 
 ---
 
+## Version Notes
+
+This repository will continue to maintain and improve the public ExpertsRS prototype.
+
+- **v0.2 - Tool-augmented update:** adds standardized remote sensing tools for the Engineer agent, environment-based LLM configuration, dynamic GeoTIFF discovery from `ExpertsRS/data/`, structured outputs under `ExpertsRS/results/`, and tool validation tests.
+- **v0.1 - Paper prototype:** initial public prototype accompanying the paper.
+
+### Tool Modules
+
+ExpertsRS currently includes four tool kits:
+
+| Module | Tools |
+|---|---|
+| `io_kit` | `list_available_data_files`, `read_raster_metadata`, `read_raster_band`, `read_raster_bands`, `save_raster` |
+| `index_kit` | `calculate_ndvi`, `calculate_evi`, `calculate_ndwi`, `calculate_nbr`, `calculate_lst`, `calculate_msavi` |
+| `analysis_kit` | `apply_threshold`, `calculate_area`, `apply_mask`, `zonal_statistics` |
+| `viz_kit` | `plot_index_map`, `plot_thematic_map`, `plot_false_color_composite` |
+
+---
+
 ## 📄 Citation
 
 If you use URSA or ExpertsRS in your work, please cite:
