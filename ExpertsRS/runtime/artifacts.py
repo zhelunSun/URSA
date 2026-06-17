@@ -60,6 +60,7 @@ class RunArtifactStore:
             "decisions": state.decisions,
             "errors": state.errors,
             "metrics": state.metrics,
+            "evidence": state.evidence,
             "extra": extra or {},
         }
         target = self.path("run_manifest.json")

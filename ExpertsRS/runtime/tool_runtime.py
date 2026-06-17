@@ -12,6 +12,7 @@ except ImportError:  # Allow imports from repository root in future package layo
     from ExpertsRS.tools import list_tools
     from ExpertsRS.tools.registry import get_tool_by_name
 
+from .contracts import get_tool_contract
 from .state import AgentRole, RunState
 
 
@@ -52,6 +53,15 @@ def _infer_artifact_kind(path: str) -> str:
     return "artifact"
 
 
+def _contract_artifact_kind(tool_name: str, path: str) -> str:
+    contract = get_tool_contract(tool_name)
+    if contract:
+        output_with_paths = [item for item in contract.output_artifacts if item.path_key]
+        if output_with_paths:
+            return output_with_paths[0].kind
+    return _infer_artifact_kind(path)
+
+
 class ToolRuntime:
     """Execute registered RS tools and write tool traces into RunState."""
 
@@ -70,6 +80,7 @@ class ToolRuntime:
             state.add_error("ToolRuntime.call", message, {"tool_name": tool_name})
             raise ValueError(message)
 
+        contract = get_tool_contract(tool_name)
         tool = get_tool_by_name(tool_name)
         if tool is None:
             message = f"Tool {tool_name!r} could not be resolved"
@@ -77,9 +88,28 @@ class ToolRuntime:
             raise ValueError(message)
 
         call_record = state.start_tool_call(tool_name, deepcopy(kwargs), role=role)
+        if contract:
+            call_record.result_summary = {
+                "contract_id": contract.contract_id,
+                "contract_version": contract.version,
+            }
+            missing = [
+                param.name
+                for param in contract.parameters
+                if param.required and kwargs.get(param.name) is None
+            ]
+            if missing:
+                message = f"Missing required parameter(s) for {tool_name}: {', '.join(missing)}"
+                state.finish_tool_call(call_record.call_id, False, message=message, result_summary=call_record.result_summary)
+                state.add_error("ToolRuntime.call", message, {"tool_name": tool_name, "missing": missing})
+                raise ValueError(message)
         try:
             result = tool(**kwargs)
             summary = _summarize_result(result)
+            if contract:
+                summary["contract_id"] = contract.contract_id
+                summary["contract_version"] = contract.version
+                summary["contract_output_kinds"] = [item.kind for item in contract.output_artifacts]
             success = bool(result.get("success")) if isinstance(result, dict) else True
             message = result.get("message") if isinstance(result, dict) else None
             state.finish_tool_call(call_record.call_id, success, message=message, result_summary=summary)
@@ -88,7 +118,7 @@ class ToolRuntime:
                 output_path = result["data"].get("output_path")
                 if output_path:
                     state.add_artifact(
-                        kind=_infer_artifact_kind(output_path),
+                        kind=_contract_artifact_kind(tool_name, output_path),
                         path=output_path,
                         source_tool_call_id=call_record.call_id,
                         label=tool_name,

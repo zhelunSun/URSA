@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .artifacts import RunArtifactStore
+from .evaluator import EvaluationResult, RuntimeEvaluator
 from .state import AgentRole, RunState, WorkflowPhase
 from .tool_runtime import ToolRuntime
 
@@ -20,10 +21,12 @@ class RuntimeWorkflow:
         state: RunState | None = None,
         tool_runtime: ToolRuntime | None = None,
         artifact_store: RunArtifactStore | None = None,
+        evaluator: RuntimeEvaluator | None = None,
     ):
         self.state = state or RunState()
         self.tools = tool_runtime or ToolRuntime()
         self.artifacts = artifact_store or RunArtifactStore()
+        self.evaluator = evaluator or RuntimeEvaluator()
         self.artifacts.bind(self.state)
 
     def initialize_request(self, user_request: str) -> RunState:
@@ -80,3 +83,9 @@ class RuntimeWorkflow:
         self.state.set_phase(WorkflowPhase.COMPLETE)
         self.artifacts.write_manifest(self.state)
         return path
+
+    def evaluate(self) -> EvaluationResult:
+        self.state.set_phase(WorkflowPhase.VERIFY)
+        result = self.evaluator.evaluate(self.state)
+        self.artifacts.write_manifest(self.state)
+        return result

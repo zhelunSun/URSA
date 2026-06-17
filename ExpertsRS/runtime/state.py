@@ -38,6 +38,7 @@ class AgentRole(str, Enum):
     SCIENTIST = "scientist"
     ENGINEER = "engineer"
     VERIFIER = "verifier"
+    REPORTER = "reporter"
     RUNTIME = "runtime"
 
 
@@ -91,6 +92,7 @@ class RunState:
     decisions: list[dict[str, Any]] = field(default_factory=list)
     errors: list[dict[str, Any]] = field(default_factory=list)
     metrics: dict[str, Any] = field(default_factory=dict)
+    evidence: list[dict[str, Any]] = field(default_factory=list)
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
 

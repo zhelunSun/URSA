@@ -1,6 +1,6 @@
 # Ch1 Modernization Plan - From Prototype Workflow to RS Agent Runtime
 
-> Status: active foundation work
+> Status: Phase 1 implemented; Phase 2-4 in progress on runtime foundation branch
 > Branch target: `codex/ch1-runtime-foundation`
 > Principle: keep the AutoGen notebook as the paper prototype archive, and build the dissertation-grade system as a runtime-first architecture.
 
@@ -137,11 +137,15 @@ This is high leverage, but it should enter through the state/tool interface, not
 - Add a minimal smoke workflow that can call tools through the runtime.
 - Add tests without changing the notebook.
 
+Status: implemented in `Add runtime foundation for ExpertsRS`.
+
 ### Phase 2 - Typed RS Tool Contracts
 
 - Enrich tool metadata with units, CRS expectations, nodata handling, band semantics, and output artifact classes.
 - Make tool outputs easier to validate automatically.
 - Add task templates for common RS workflows such as vegetation mapping, water extraction, LST, burn mapping, and zonal statistics.
+
+Status: implement a framework-neutral contract registry before changing tool bodies.
 
 ### Phase 3 - Orchestration Upgrade
 
@@ -149,6 +153,8 @@ This is high leverage, but it should enter through the state/tool interface, not
 - Convert Manager/Scientist/Engineer/Verifier into graph nodes over `RunState`.
 - Add human checkpoints for request approval, plan approval, and final review.
 - Keep AutoGen notebook as historical reference, not the active architecture.
+
+Status: deferred until deterministic runtime, contracts, evaluator, and first task template are stable.
 
 ### Phase 4 - Evaluation Harness
 
@@ -184,4 +190,3 @@ Success criteria:
 - new runtime test passes
 - no notebook behavior changes
 - one runtime run can produce a manifest and tool trace
-
