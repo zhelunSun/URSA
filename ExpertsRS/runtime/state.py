@@ -77,6 +77,24 @@ class ArtifactRecord:
 
 
 @dataclass
+class BackendCallRecordState:
+    call_id: str
+    role: str
+    backend_type: str
+    provider: str
+    model: str | None = None
+    purpose: str | None = None
+    started_at: str = field(default_factory=_now_iso)
+    finished_at: str | None = None
+    status: str = "started"
+    token_input: int | None = None
+    token_output: int | None = None
+    cost_usd: float | None = None
+    latency_ms: int | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class RunState:
     run_id: str = field(default_factory=lambda: f"run_{uuid4().hex[:12]}")
     phase: str = WorkflowPhase.CREATED.value
@@ -93,6 +111,7 @@ class RunState:
     errors: list[dict[str, Any]] = field(default_factory=list)
     metrics: dict[str, Any] = field(default_factory=dict)
     evidence: list[dict[str, Any]] = field(default_factory=list)
+    backend_calls: list[BackendCallRecordState] = field(default_factory=list)
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
 
@@ -196,6 +215,7 @@ class RunState:
         payload["tool_calls"] = [ToolCallRecord(**item) for item in payload.get("tool_calls", [])]
         payload["artifacts"] = [ArtifactRecord(**item) for item in payload.get("artifacts", [])]
         payload["checkpoints"] = [HumanCheckpoint(**item) for item in payload.get("checkpoints", [])]
+        payload["backend_calls"] = [BackendCallRecordState(**item) for item in payload.get("backend_calls", [])]
         return cls(**payload)
 
     def save(self, path: str | Path) -> None:

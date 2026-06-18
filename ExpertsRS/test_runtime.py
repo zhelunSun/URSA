@@ -14,8 +14,12 @@ from runtime import (
     RuntimeWorkflow,
     ToolRuntime,
     WorkflowPhase,
+    add_evidence,
+    backend_plan_to_dict,
     build_vegetation_orchestrator,
     describe_langgraph_adapter,
+    finish_backend_call,
+    start_backend_call,
     validate_contract_registry,
     vegetation_mapping_ndvi_threshold,
 )
@@ -124,6 +128,28 @@ def main():
             except ValueError:
                 pass
             assert_true(missing_param.errors, "tool runtime records missing required parameters")
+
+            backend_plan = backend_plan_to_dict()
+            assert_true("scientist" in backend_plan and "engineer" in backend_plan, "default backend plan covers core agent roles")
+            backend_call = start_backend_call(
+                state,
+                role="scientist",
+                backend_type="llm_with_retrieval",
+                provider="test_provider",
+                model="test_model",
+                purpose="record provenance only",
+            )
+            finish_backend_call(state, backend_call.call_id, status="ok", token_input=10, token_output=5, latency_ms=123)
+            add_evidence(
+                state,
+                role="scientist",
+                source="test knowledge base",
+                summary="NDVI thresholding is a baseline vegetation mapping method.",
+                citation="runtime-test",
+            )
+            store.write_manifest(state)
+            assert_true(state.backend_calls[-1].finished_at is not None, "backend call provenance records completion")
+            assert_true(state.evidence[-1]["citation"] == "runtime-test", "evidence provenance records citations")
 
             task_workflow = vegetation_mapping_ndvi_threshold(
                 user_request="Map vegetation for runtime validation.",

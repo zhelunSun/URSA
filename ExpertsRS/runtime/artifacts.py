@@ -61,6 +61,7 @@ class RunArtifactStore:
             "errors": state.errors,
             "metrics": state.metrics,
             "evidence": state.evidence,
+            "backend_calls": [item.__dict__ for item in state.backend_calls],
             "extra": extra or {},
         }
         target = self.path("run_manifest.json")

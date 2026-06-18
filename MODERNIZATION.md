@@ -1,6 +1,6 @@
 # Ch1 Modernization Plan - From Prototype Workflow to RS Agent Runtime
 
-> Status: Phase 1-4 implemented; Phase 5 orchestration adapter in progress on runtime foundation branch
+> Status: Phase 1-5 implemented; Phase 6 backend provenance interfaces in progress on runtime foundation branch
 > Branch target: `codex/ch1-runtime-foundation`
 > Principle: keep the AutoGen notebook as the paper prototype archive, and build the dissertation-grade system as a runtime-first architecture.
 
@@ -178,6 +178,8 @@ Status: framework-neutral orchestrator implemented; concrete LangGraph durable e
 - Connect Scientist to literature and domain knowledge retrieval.
 - Connect Engineer to Claude Code CLI or another coding backend for complex repo-level tasks.
 - Expose selected tools through MCP where it improves interoperability.
+
+Status: provenance interfaces for backend calls, role routing, and evidence/citations implemented; live providers remain future work.
 
 ## Immediate Implementation Scope
 
