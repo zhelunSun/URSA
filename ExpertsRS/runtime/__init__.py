@@ -23,6 +23,12 @@ from .contracts import (
     validate_contract_registry,
 )
 from .evaluator import EvaluationResult, RuntimeEvaluator
+from .langgraph_adapter import describe_langgraph_adapter, require_langgraph
+from .orchestration import (
+    NodeResult,
+    RuntimeOrchestrator,
+    build_vegetation_orchestrator,
+)
 from .tasks import vegetation_mapping_ndvi_threshold
 from .tool_runtime import ToolRuntime
 from .workflow import RuntimeWorkflow
@@ -37,7 +43,9 @@ __all__ = [
     "RunArtifactStore",
     "RunState",
     "RuntimeEvaluator",
+    "RuntimeOrchestrator",
     "RuntimeWorkflow",
+    "NodeResult",
     "ToolContract",
     "ToolCallRecord",
     "ToolRuntime",
@@ -45,6 +53,9 @@ __all__ = [
     "WorkflowPhase",
     "get_tool_contract",
     "list_tool_contracts",
+    "describe_langgraph_adapter",
+    "require_langgraph",
+    "build_vegetation_orchestrator",
     "validate_contract_registry",
     "vegetation_mapping_ndvi_threshold",
 ]

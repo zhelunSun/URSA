@@ -1,6 +1,6 @@
 # Ch1 Modernization Plan - From Prototype Workflow to RS Agent Runtime
 
-> Status: Phase 1 implemented; Phase 2-4 in progress on runtime foundation branch
+> Status: Phase 1-4 implemented; Phase 5 orchestration adapter in progress on runtime foundation branch
 > Branch target: `codex/ch1-runtime-foundation`
 > Principle: keep the AutoGen notebook as the paper prototype archive, and build the dissertation-grade system as a runtime-first architecture.
 
@@ -147,22 +147,32 @@ Status: implemented in `Add runtime foundation for ExpertsRS`.
 
 Status: implement a framework-neutral contract registry before changing tool bodies.
 
-### Phase 3 - Orchestration Upgrade
-
-- Add a LangGraph adapter or comparable graph runtime.
-- Convert Manager/Scientist/Engineer/Verifier into graph nodes over `RunState`.
-- Add human checkpoints for request approval, plan approval, and final review.
-- Keep AutoGen notebook as historical reference, not the active architecture.
-
-Status: deferred until deterministic runtime, contracts, evaluator, and first task template are stable.
-
-### Phase 4 - Evaluation Harness
+### Phase 3 - Evaluation Harness
 
 - Build curated benchmark tasks with expected tool trajectories and output constraints.
 - Evaluate plan quality, parameter quality, artifact completeness, and final report faithfulness.
 - Record model/provider/cost/runtime metadata for each run.
 
-### Phase 5 - Advanced Agent Backends
+Status: deterministic evaluator implemented; curated benchmark expansion remains future work.
+
+### Phase 4 - Minimal RS Task Templates
+
+- Build deterministic templates that prove the runtime can complete full remote-sensing tasks without LLM orchestration.
+- Start with `vegetation_mapping_ndvi_threshold`.
+- Expand later to water extraction, LST, burn mapping, and zonal statistics.
+
+Status: first vegetation mapping template implemented.
+
+### Phase 5 - Orchestration Upgrade
+
+- Add a framework-neutral node orchestrator first.
+- Convert Manager/Scientist/Engineer/Verifier/Reporter into graph nodes over `RunState`.
+- Keep LangGraph as an optional adapter, not a hard runtime dependency.
+- Keep AutoGen notebook as historical reference, not the active architecture.
+
+Status: framework-neutral orchestrator implemented; concrete LangGraph durable execution remains future work.
+
+### Phase 6 - Advanced Agent Backends
 
 - Add per-agent model routing.
 - Connect Scientist to literature and domain knowledge retrieval.

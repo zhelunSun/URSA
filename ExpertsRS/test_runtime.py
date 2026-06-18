@@ -14,6 +14,8 @@ from runtime import (
     RuntimeWorkflow,
     ToolRuntime,
     WorkflowPhase,
+    build_vegetation_orchestrator,
+    describe_langgraph_adapter,
     validate_contract_registry,
     vegetation_mapping_ndvi_threshold,
 )
@@ -135,6 +137,22 @@ def main():
             assert_true(any(item.kind == "map" for item in task_workflow.state.artifacts), "vegetation task records map artifacts")
             assert_true(any(item.kind == "report" for item in task_workflow.state.artifacts), "vegetation task records report artifact")
             assert_true((task_workflow.artifacts.run_dir / "run_manifest.json").exists(), "vegetation task writes manifest")
+
+            orchestrator = build_vegetation_orchestrator(
+                user_request="Map vegetation through orchestrated runtime nodes.",
+                artifact_base_dir=tmp,
+            )
+            graph_description = describe_langgraph_adapter(orchestrator)
+            assert_true(graph_description["start_node"] == "manager", "orchestrator exposes a graph start node")
+            orchestrated = orchestrator.run({
+                "aoi": "local orchestrator extent",
+                "time_period": "local orchestrator period",
+                "threshold": 0.3,
+            })
+            trace = orchestrated.state.metrics.get("orchestration_trace", [])
+            assert_true([item["node_name"] for item in trace] == ["manager", "scientist", "approval", "engineer", "verifier", "reporter"], "orchestrator runs expected node sequence")
+            assert_true(orchestrated.state.metrics.get("evaluation_status") == "pass", "orchestrated vegetation workflow passes evaluator")
+            assert_true(orchestrated.state.phase == WorkflowPhase.COMPLETE.value, "orchestrated workflow completes")
     finally:
         _cleanup_new_results(before_results)
     print("=" * 60)
