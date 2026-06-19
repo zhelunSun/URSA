@@ -24,7 +24,7 @@ def _get_project_root() -> str:
 def _ensure_results_dir(subfolder: str = "") -> str:
     """Create results/ subfolder and return its absolute path."""
     root = _get_project_root()
-    results = os.path.join(root, "results")
+    results = os.getenv("EXPERTSRS_RESULTS_DIR") or os.path.join(root, "results")
     if subfolder:
         results = os.path.join(results, subfolder)
     os.makedirs(results, exist_ok=True)

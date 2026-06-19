@@ -28,6 +28,7 @@ class RuntimeWorkflow:
         self.artifacts = artifact_store or RunArtifactStore()
         self.evaluator = evaluator or RuntimeEvaluator()
         self.artifacts.bind(self.state)
+        self.tools.set_output_dir(str(self.artifacts.path("tool_outputs")))
 
     def initialize_request(self, user_request: str) -> RunState:
         self.state.user_request = user_request

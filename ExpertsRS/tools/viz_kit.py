@@ -32,7 +32,7 @@ def _get_timestamp() -> str:
 def _ensure_results_dir() -> str:
     from .io_kit import _get_project_root
     root = _get_project_root()
-    results = os.path.join(root, "results")
+    results = os.getenv("EXPERTSRS_RESULTS_DIR") or os.path.join(root, "results")
     os.makedirs(results, exist_ok=True)
     return results
 

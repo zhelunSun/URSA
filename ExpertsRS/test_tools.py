@@ -2,7 +2,13 @@
 test_tools.py — Phase 1 tool module verification tests
 """
 import sys, os
+import atexit
+import tempfile
 sys.path.insert(0, os.path.dirname(__file__))
+
+_tool_test_output_tmp = tempfile.TemporaryDirectory()
+os.environ["EXPERTSRS_RESULTS_DIR"] = _tool_test_output_tmp.name
+atexit.register(_tool_test_output_tmp.cleanup)
 
 print("=" * 60)
 print("ExpertsRS Tools Module — Verification Tests")
@@ -85,10 +91,8 @@ try:
     from rasterio.transform import from_origin
     from tools.io_kit import read_raster_band, read_raster_bands
 
-    tmp_dir = os.path.join(os.path.dirname(__file__), ".test_tmp")
-    os.makedirs(tmp_dir, exist_ok=True)
-    test_raster = os.path.join(tmp_dir, "band_indexing.tif")
-    try:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        test_raster = os.path.join(tmp_dir, "band_indexing.tif")
         profile = {
             "driver": "GTiff",
             "height": 2,
@@ -109,11 +113,6 @@ try:
         assert first["success"] and first["data"]["min"] == 11.0
         assert second["success"] and second["data"]["min"] == 22.0
         assert both["success"] and both["data"]["bands_read"] == [1, 2]
-    finally:
-        if os.path.exists(test_raster):
-            os.remove(test_raster)
-        if os.path.isdir(tmp_dir) and not os.listdir(tmp_dir):
-            os.rmdir(tmp_dir)
 
     print(f"[PASS] raster band indexing uses 1-based rasterio bands correctly")
     passed += 1

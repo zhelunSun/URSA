@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import os
 from typing import Any
 
 try:
@@ -65,8 +66,12 @@ def _contract_artifact_kind(tool_name: str, path: str) -> str:
 class ToolRuntime:
     """Execute registered RS tools and write tool traces into RunState."""
 
-    def __init__(self):
+    def __init__(self, output_dir: str | None = None):
         self.available_tools = set(list_tools())
+        self.output_dir = output_dir
+
+    def set_output_dir(self, output_dir: str | None) -> None:
+        self.output_dir = output_dir
 
     def call(
         self,
@@ -104,7 +109,17 @@ class ToolRuntime:
                 state.add_error("ToolRuntime.call", message, {"tool_name": tool_name, "missing": missing})
                 raise ValueError(message)
         try:
-            result = tool(**kwargs)
+            previous_output_dir = os.environ.get("EXPERTSRS_RESULTS_DIR")
+            if self.output_dir:
+                os.environ["EXPERTSRS_RESULTS_DIR"] = self.output_dir
+            try:
+                result = tool(**kwargs)
+            finally:
+                if self.output_dir:
+                    if previous_output_dir is None:
+                        os.environ.pop("EXPERTSRS_RESULTS_DIR", None)
+                    else:
+                        os.environ["EXPERTSRS_RESULTS_DIR"] = previous_output_dir
             summary = _summarize_result(result)
             if contract:
                 summary["contract_id"] = contract.contract_id
