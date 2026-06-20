@@ -152,6 +152,9 @@ Status: implement a framework-neutral contract registry before changing tool bod
 - Build curated benchmark tasks with expected tool trajectories and output constraints.
 - Evaluate plan quality, parameter quality, artifact completeness, and final report faithfulness.
 - Record model/provider/cost/runtime metadata for each run.
+- Keep the scope as a lightweight evaluation harness, not a new heavy benchmark paper.
+- Add a benchmark inventory pass that collects existing remote-sensing agent benchmarks and the thesis-side 20-dataset benchmark materials before creating new tasks.
+- Represent each benchmark candidate as a task card: user goal, domain, dataset/source, expected data choice, expected method/tool sequence, artifact requirements, grading rubric, and review status.
 
 Status: deterministic evaluator implemented; curated benchmark expansion remains future work.
 
@@ -160,6 +163,9 @@ Status: deterministic evaluator implemented; curated benchmark expansion remains
 - Build deterministic templates that prove the runtime can complete full remote-sensing tasks without LLM orchestration.
 - Start with `vegetation_mapping_ndvi_threshold`.
 - Expand later to water extraction, LST, burn mapping, and zonal statistics.
+- Generate templates from three sources, in priority order: existing thesis tasks and datasets, accepted remote-sensing domain methods, and expert-reviewed synthetic task cards.
+- Mark every template with `review_status`: `system_generated`, `evidence_backed`, `expert_reviewed`, or `paper_reproduction`.
+- Do not treat unreviewed generated templates as thesis evidence; use them only for engineering smoke tests.
 
 Status: first vegetation mapping template implemented.
 
@@ -178,8 +184,31 @@ Status: framework-neutral orchestrator implemented; concrete LangGraph durable e
 - Connect Scientist to literature and domain knowledge retrieval.
 - Connect Engineer to Claude Code CLI or another coding backend for complex repo-level tasks.
 - Expose selected tools through MCP where it improves interoperability.
+- Add a file-backed evidence memory before live retrieval: method cards, dataset cards, benchmark cards, and citation records.
+- Require every retrieved or generated knowledge item to enter `RunState.evidence` and `run_manifest.json`.
+- Human review is required before evidence memory is used as thesis evidence, but not before using it as engineering context.
 
 Status: provenance interfaces for backend calls, role routing, and evidence/citations implemented; live providers remain future work.
+
+## Evaluation Strategy
+
+Evaluation is broader than a benchmark. The runtime should support three levels:
+
+1. Engineering checks: unit/smoke tests for tools, contracts, manifests, and evaluator behavior.
+2. Process evaluation: whether the workflow chooses reasonable data, methods, tools, parameters, artifacts, and limitations.
+3. Benchmark/task-set evaluation: a curated set of task cards, including the thesis-side 20-dataset benchmark if the materials are available and reviewable.
+
+The minimum dissertation-safe claim is process-level improvement: executability, traceability, evidence discipline, and verification quality. The project should avoid claiming a new general remote-sensing benchmark unless the task set is explicitly curated, documented, and reviewed.
+
+## Naming and Repository Strategy
+
+Keep `ExpertsRS` as the archived prototype name for the paper reproduction window. Use a clearer formal system name for the runtime layer, for example:
+
+- `URSA Runtime`: preferred for repository and portfolio continuity.
+- `URSA-Agent`: good if the public identity should foreground the agent system.
+- `ExpertsRS Runtime`: acceptable for backward compatibility, but it sounds more like a prototype extension than a dissertation-grade system.
+
+Recommendation: keep the repository name `URSA`, keep `ExpertsRS/` for backward compatibility, and present the upgraded system publicly as `URSA Runtime: a verifiable remote-sensing agent workflow runtime`.
 
 ## Immediate Implementation Scope
 
