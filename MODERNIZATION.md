@@ -1,6 +1,6 @@
 # Ch1 Modernization Plan - From Prototype Workflow to RS Agent Runtime
 
-> Status: Phase 1-5 implemented; Phase 6 backend provenance interfaces in progress on runtime foundation branch
+> Status: Phase 1-6 foundation interfaces implemented; next checkpoint is autonomous-development control, evidence memory, benchmark cards, and MCP/backend adapters
 > Branch target: `codex/ch1-runtime-foundation`
 > Principle: keep the AutoGen notebook as the paper prototype archive, and build the dissertation-grade system as a runtime-first architecture.
 
@@ -40,9 +40,73 @@ Modern research-agent systems increasingly treat the environment as the core obj
 
 - EurekAgent: explicit state graph, artifacts, budget control, resumability, human interface, and isolated evaluation.
 - Earth-Agent and related EO agents: MCP-style tool ecosystems, tool trajectory evaluation, and multi-modal remote-sensing task coverage.
+- OpenEarth-Agent: adaptive data probing, workflow DAG construction, tool creation, and geoscience checking loops for open-environment EO.
 - AI Scientist-style systems: experiment loops, reviewers, and evaluation around complete research cycles.
+- OpenHands SDK-style engineering agents: event-sourced state, modular tool/workspace packages, sandbox/lifecycle control, and model routing.
 
 The lesson for Ch1 is: do not merely add more agents. Make domain constraints, tools, evidence, and provenance first-class citizens.
+
+## External Agent Scan - Calibration
+
+The agent survey changes the priority order, but not the core architecture. The formal Ch1 system should not become a clone of Earth-Agent, OpenEarth-Agent, EurekAgent, AI Scientist, OpenHands, LangGraph, or MCP. It should use their strongest lessons to make the URSA thesis claim sharper.
+
+### Primary references
+
+| Reference | What to learn | What not to copy directly | Priority for URSA Runtime |
+|---|---|---|---|
+| Earth-Agent / Earth-Bench | EO agents need spectral/RGB/product awareness, domain tool ecosystems, and dual evaluation of tool trajectory plus final output. | Do not try to rebuild a 248-task benchmark immediately. Use it as evaluation grammar. | High: informs task cards, trajectory checks, and MCP interoperability. |
+| OpenEarth-Agent / OpenEarth-Bench | Open EO requires data probing, adaptive workflow planning, DAG-style tool creation, and checking against geoscience rules. | Do not jump from 18 tools to massive open-ended tool creation before the closed-loop runtime is reliable. | High later: make data profiling and checker-driven repair a Phase 7/8 path. |
+| EurekAgent | The environment is the agent product: permissions, artifacts, budget, human intervention, and isolated evaluation matter as much as prompts. | Do not overfit to metric-search scientific discovery. URSA tasks are geospatial workflows, not only scalar optimization. | Highest: drives the next control-plane checkpoint. |
+| OpenHands SDK | Production agents need modular packages, event-sourced state, one mutable state source, sandbox/workspace abstraction, lifecycle control, and multi-provider routing. | Do not import a software-engineering agent wholesale as the RS runtime. | Highest for engineering hardening and long-running autonomous development. |
+| AI Scientist / AI Scientist v2 | A credible research agent records idea-code-experiment-analysis-review loops and treats review as a first-class stage. | Do not promise automatic paper generation or autonomous scientific novelty for Ch1. | Medium: borrow experiment/reviewer structure for reports and evaluation. |
+| LangGraph | Durable, stateful, human-in-the-loop graph orchestration is a good runtime adapter. | Do not make LangGraph the source of truth for RS state or artifacts. | Medium: adapter after core runtime and evaluator remain stable. |
+| MCP | Standard tool/data interface improves interoperability across Claude Code, ChatGPT, IDEs, and future agents. | Do not expose tools through MCP before local contracts, permissions, and provenance are stable. | Medium-high: add as adapter, not foundation. |
+
+### First-principles design rules
+
+1. The unit of contribution is the remote-sensing task environment, not the chat transcript.
+2. Every important action must become structured state: request, data, plan, tool call, artifact, evidence, error, checkpoint, evaluation, and cost.
+3. The runtime must be able to answer five audit questions from `run_manifest.json`: what did the user ask, what data was used, what tools ran, where are the artifacts, and why did the verifier pass or fail.
+4. Domain memory must be reviewable evidence, not free-floating conversation memory.
+5. Open-ended tool creation is a future layer. The current foundation must first master deterministic closed-loop execution and evaluation.
+6. Orchestration frameworks and agent backends are replaceable adapters. The RS runtime, contracts, artifact store, evidence store, and evaluator are the stable center.
+
+### Recalibrated upgrade priority
+
+1. P0 - Execution control plane for long-running autonomous development.
+   - Fix the automation gap exposed by `VALIDATION-REPORT.md`: a plan file and script are not enough unless scheduling, environment, logs, and post-run validation are closed.
+   - Standardize executable validation commands around script tests first: `python ExpertsRS/test_runtime.py`, `python ExpertsRS/test_tools.py`, and `python -m compileall -q ExpertsRS/runtime ExpertsRS/test_runtime.py`.
+   - Track agent-produced run reports as ignored operational artifacts unless they are promoted into formal docs.
+
+2. P1 - Evidence memory and benchmark inventory.
+   - Add file-backed method cards, dataset cards, benchmark cards, and citation records.
+   - Include the thesis-side 20-dataset benchmark only after the materials are located and converted into reviewed task cards.
+   - Keep review status explicit: `system_generated`, `evidence_backed`, `expert_reviewed`, or `paper_reproduction`.
+
+3. P2 - Data profiling and RS task expansion.
+   - Make `discover data -> read metadata` a stronger first stage for every template.
+   - Add water extraction, LST, burn mapping, and zonal statistics as deterministic templates before LLM-driven adaptive planning.
+   - Add geoscience checks such as nodata ratio, CRS/resolution consistency, valid index range, empty-output detection, and map/report completeness.
+
+4. P3 - MCP and backend adapters.
+   - Expose selected runtime-safe tools through MCP only after contracts and provenance are attached.
+   - Add Claude Code CLI as an optional Engineer backend that writes code or patches, but route all data products and validations back through the runtime manifest.
+   - Keep model/provider/cost/latency routing in backend provenance.
+
+5. P4 - Open-environment research agent layer.
+   - Add adaptive data probing, plan aggregation, workflow DAG generation, code/tool creation, and checker-driven repair.
+   - Treat generated tools as artifacts with contracts, tests, provenance, and review status before they become reusable tools.
+
+### Sources reviewed
+
+- Earth-Agent / Earth-Bench: https://arxiv.org/abs/2509.23141
+- OpenEarth-Agent / OpenEarth-Bench: https://arxiv.org/abs/2603.22148
+- OpenEarthAgent unified geospatial agents: https://arxiv.org/abs/2602.17665
+- EurekAgent: https://arxiv.org/abs/2606.13662
+- OpenHands SDK: https://arxiv.org/abs/2511.03690 and https://github.com/OpenHands/OpenHands
+- AI Scientist: https://arxiv.org/abs/2408.06292 and https://github.com/SakanaAI/AI-Scientist
+- LangGraph overview: https://docs.langchain.com/oss/python/langgraph/overview
+- Model Context Protocol: https://modelcontextprotocol.io/docs/getting-started/intro
 
 ## Minimum Dissertation-Grade System
 
@@ -145,7 +209,7 @@ Status: implemented in `Add runtime foundation for ExpertsRS`.
 - Make tool outputs easier to validate automatically.
 - Add task templates for common RS workflows such as vegetation mapping, water extraction, LST, burn mapping, and zonal statistics.
 
-Status: implement a framework-neutral contract registry before changing tool bodies.
+Status: implemented as a framework-neutral contract registry for the existing 18 tools. Next work is to enrich the contracts with stronger geospatial validation rules and use them in evaluator checks.
 
 ### Phase 3 - Evaluation Harness
 
@@ -156,7 +220,7 @@ Status: implement a framework-neutral contract registry before changing tool bod
 - Add a benchmark inventory pass that collects existing remote-sensing agent benchmarks and the thesis-side 20-dataset benchmark materials before creating new tasks.
 - Represent each benchmark candidate as a task card: user goal, domain, dataset/source, expected data choice, expected method/tool sequence, artifact requirements, grading rubric, and review status.
 
-Status: deterministic evaluator implemented; curated benchmark expansion remains future work.
+Status: deterministic evaluator implemented. Curated benchmark expansion remains future work and should start with a benchmark inventory, not new synthetic tasks.
 
 ### Phase 4 - Minimal RS Task Templates
 
@@ -167,7 +231,7 @@ Status: deterministic evaluator implemented; curated benchmark expansion remains
 - Mark every template with `review_status`: `system_generated`, `evidence_backed`, `expert_reviewed`, or `paper_reproduction`.
 - Do not treat unreviewed generated templates as thesis evidence; use them only for engineering smoke tests.
 
-Status: first vegetation mapping template implemented.
+Status: first vegetation mapping template implemented. Next templates should be water extraction, LST, burn mapping, and zonal statistics, each with explicit review status.
 
 ### Phase 5 - Orchestration Upgrade
 
@@ -188,7 +252,7 @@ Status: framework-neutral orchestrator implemented; concrete LangGraph durable e
 - Require every retrieved or generated knowledge item to enter `RunState.evidence` and `run_manifest.json`.
 - Human review is required before evidence memory is used as thesis evidence, but not before using it as engineering context.
 
-Status: provenance interfaces for backend calls, role routing, and evidence/citations implemented; live providers remain future work.
+Status: provenance interfaces for backend calls, role routing, and evidence/citations implemented. Next work is file-backed evidence memory, benchmark cards, and then live providers/MCP/Claude Code CLI adapters.
 
 ## Evaluation Strategy
 
@@ -200,6 +264,23 @@ Evaluation is broader than a benchmark. The runtime should support three levels:
 
 The minimum dissertation-safe claim is process-level improvement: executability, traceability, evidence discipline, and verification quality. The project should avoid claiming a new general remote-sensing benchmark unless the task set is explicitly curated, documented, and reviewed.
 
+## Autonomous Development Control
+
+The validation report from the external agent run exposed an execution-chain problem: `PLAN.md`, `prompt.md`, and `auto-dev.ps1` existed, but the task was never registered with the scheduler, so the agent process did not start. This should be treated as a planning lesson for long-running autonomous development.
+
+Before another long unattended run, the repository should have:
+
+- a local preflight command that checks branch, Python executable, dependency availability, writable run directory, and expected validation commands
+- a canonical validation command list that matches the current script-style tests:
+  - `python ExpertsRS/test_runtime.py`
+  - `python ExpertsRS/test_tools.py`
+  - `python -m compileall -q ExpertsRS/runtime ExpertsRS/test_runtime.py`
+- a heartbeat/log artifact for every autonomous run, for example `.ccp-running` plus `ccp-execution-YYYY-MM-DD.log`
+- a post-run validator that checks whether a process actually launched, whether commits were created, and whether ignored operational reports should be promoted into tracked docs
+- an explicit rule that generated planning files stay ignored unless their content is deliberately merged into `MODERNIZATION.md` or a formal design document
+
+This control plane is now higher priority than adding another orchestration library. It reduces drift, makes overnight work auditable, and protects the thesis direction from accidental automation failures.
+
 ## Naming and Repository Strategy
 
 Keep `ExpertsRS` as the archived prototype name for the paper reproduction window. Use a clearer formal system name for the runtime layer, for example:
@@ -210,24 +291,27 @@ Keep `ExpertsRS` as the archived prototype name for the paper reproduction windo
 
 Recommendation: keep the repository name `URSA`, keep `ExpertsRS/` for backward compatibility, and present the upgraded system publicly as `URSA Runtime: a verifiable remote-sensing agent workflow runtime`.
 
-## Immediate Implementation Scope
-
-The first implementation should be deliberately small:
+## Next Implementation Scope
 
 ```text
 ExpertsRS/runtime/
-  __init__.py
-  state.py
-  artifacts.py
-  tool_runtime.py
-  workflow.py
+  memory.py              # file-backed evidence, method, dataset, and benchmark cards
+  benchmark_cards.py     # task-card schema and review-status gate
+  preflight.py           # branch/env/test-command checks for unattended runs
 
-ExpertsRS/test_runtime.py
+ExpertsRS/tasks/
+  water_extraction.py
+  lst_mapping.py
+  burn_mapping.py
+  zonal_statistics.py
+
+ExpertsRS/mcp_server/     # adapter only after contracts/provenance remain attached
 ```
 
 Success criteria:
 
-- existing `ExpertsRS/test_tools.py` still passes
-- new runtime test passes
-- no notebook behavior changes
-- one runtime run can produce a manifest and tool trace
+- `ExpertsRS_notebook.ipynb` remains untouched as the prototype archive
+- `run_manifest.json` records request, data, tool trace, artifacts, evidence, backend provenance, and verifier result
+- every new task card has `review_status` and source/evidence fields
+- every autonomous run leaves a heartbeat/log and passes the canonical script tests
+- MCP and Claude Code CLI never bypass `ToolRuntime`, artifact records, or evaluator checks

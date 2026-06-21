@@ -26,6 +26,9 @@ results/
 *.jpg
 *.png
 
+# Test cache
+.pytest_cache/
+
 # Local test scratch space
 .test_tmp/
 tmp*/
@@ -39,5 +42,20 @@ upgrade_progress.md
 Thumbs.db
 
 # GEE credentials (if used)
-*.json
+# EXCLUDE: do NOT use *.json — blocks .mcp.json, geojson, etc.
+# Only exclude llm_config_list.json (contains API keys)
+ExpertsRS/llm_config_list.json
 earthengine
+
+# Runtime output directories
+ExpertsRS/results/
+tool_outputs/
+expertsrs_runs/
+.workbuddy/
+
+# CCP session artifacts (temporary)
+CCP-EXECUTION-REPORT.md
+auto-dev.ps1
+prompt.md
+PLAN.md
+VALIDATION-REPORT.md
