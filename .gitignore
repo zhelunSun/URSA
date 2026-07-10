@@ -41,3 +41,6 @@ Thumbs.db
 # GEE credentials (if used)
 *.json
 earthengine
+
+# WorkBuddy private state (memory, automations)
+.workbuddy/
