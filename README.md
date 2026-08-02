@@ -1,6 +1,6 @@
 # User-centric Remote Sensing Analysis (URSA) based on Large Language Models
 
-> **Workspace note:** This is a non-default duplicate checkout. For thesis Chapter 1 work, start from `D:/Projects/phd-research/ch1-agent-workflow/`; use this repository only for explicit comparison or recovery tasks.
+> **Workspace note:** This checkout is the active local Chapter 1 prototype surface. The current thesis alignment intake is maintained in `docs/thesis/ch1_idea_release_intake_20260802.md`; the public URSA/ExpertsRS claims remain unchanged.
 
 > Towards the Future of Remote Sensing Analysis with state-of-the-art AI technology.
 
