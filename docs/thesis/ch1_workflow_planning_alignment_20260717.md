@@ -78,4 +78,3 @@ quality judgments remain separate outcomes.
 - Do not claim that an end-to-end successful demo proves better planning.
 - Do not make Chapter 1 depend on the full Chapter 2 knowledge base; manually
   supplied constraints must remain a valid test path.
-

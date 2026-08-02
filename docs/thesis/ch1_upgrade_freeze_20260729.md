@@ -147,4 +147,3 @@ Before the outline is treated as opening-ready, Chapter 1 should provide:
 3. a small P0--P3 pilot using matched conditions;
 4. inspectable traces and a result manifest;
 5. an explicit comparison with the evidence already published in ExpertsRS.
-
