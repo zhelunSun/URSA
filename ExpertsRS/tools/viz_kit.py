@@ -10,6 +10,8 @@ import numpy as np
 import rasterio
 from datetime import datetime
 
+from .io_kit import ScientificPreconditionError, _resolve_band_reference
+
 # Visualization dependencies — import lazily to fail gracefully
 try:
     import matplotlib
@@ -255,9 +257,9 @@ def plot_thematic_map(file_path: str, class_labels: dict = None,
 
 
 def plot_false_color_composite(file_path: str = None,
-                                nir_band: int = 8,
-                                red_band: int = 4,
-                                green_band: int = 3,
+                                nir_band: str = "B8",
+                                red_band: str = "B4",
+                                green_band: str = "B3",
                                 output_name: str = None) -> dict:
     """
     Generate a false-color composite image from three spectral bands.
@@ -268,7 +270,8 @@ def plot_false_color_composite(file_path: str = None,
 
     Args:
         file_path: Path to multi-band raster. Auto-discovers if None.
-        nir_band, red_band, green_band: 1-based band indices.
+        nir_band, red_band, green_band: Semantic band names. Numeric strings or
+                                      ints are explicit verified stack indices.
         output_name: Custom output name.
 
     Returns:
@@ -287,17 +290,23 @@ def plot_false_color_composite(file_path: str = None,
             file_path = _resolve_data_path(None)
 
         with rasterio.open(file_path) as src:
-            nir = src.read(nir_band).astype(np.float32)
-            red = src.read(red_band).astype(np.float32)
-            green = src.read(green_band).astype(np.float32)
+            selections = {}
+            arrays = {}
+            for role, reference in {
+                "nir": nir_band, "red": red_band, "green": green_band
+            }.items():
+                index, description, resolution = _resolve_band_reference(
+                    src, reference, role=role
+                )
+                arrays[role] = src.read(index, masked=True).astype(np.float32).filled(np.nan)
+                selections[role] = {
+                    "requested": reference,
+                    "stack_index": index,
+                    "description": description,
+                    "resolution": resolution,
+                }
+            nir, red, green = arrays["nir"], arrays["red"], arrays["green"]
             bounds = _get_geo_bounds(src)
-            nodata = src.nodata
-
-        # Replace nodata
-        if nodata is not None:
-            nir = np.where(nir == nodata, np.nan, nir)
-            red = np.where(red == nodata, np.nan, red)
-            green = np.where(green == nodata, np.nan, green)
 
         # Normalize to 0-1 for display
         def normalize(arr):
@@ -308,7 +317,8 @@ def plot_false_color_composite(file_path: str = None,
         rgb = np.dstack([normalize(nir), normalize(red), normalize(green)])
 
         ts = _get_timestamp()
-        fname_jpg = f"final_fcc_{output_name or f'bands{nir_band}{red_band}{green_band}'}_{ts}.jpg"
+        positions = "".join(str(selections[role]["stack_index"]) for role in ("nir", "red", "green"))
+        fname_jpg = f"final_fcc_{output_name or f'bands{positions}'}_{ts}.jpg"
         out_path = os.path.join(_ensure_results_dir(), fname_jpg)
 
         fig, ax = plt.subplots(figsize=(10, 8))
@@ -334,10 +344,17 @@ def plot_false_color_composite(file_path: str = None,
             "data": {
                 "output_path": out_path,
                 "file_name": fname_jpg,
-                "bands": {"nir": nir_band, "red": red_band, "green": green_band},
+                "band_selection": selections,
             }
         }
     except FileNotFoundError as e:
         return {"success": False, "message": str(e), "data": None}
+    except ScientificPreconditionError as e:
+        return {
+            "success": False,
+            "message": f"False-color scientific precondition failed: {e}",
+            "data": None,
+            "error_code": "scientific_precondition_failed",
+        }
     except Exception as e:
         return {"success": False, "message": f"False-color composite failed: {e}", "data": None}

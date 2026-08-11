@@ -10,6 +10,8 @@ import numpy as np
 import rasterio
 from datetime import datetime
 
+from .io_kit import ScientificPreconditionError
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -28,11 +30,26 @@ def _ensure_results_dir() -> str:
 
 
 def _load_index_raster(file_path: str):
-    """Load a single-band raster as float32 array + profile."""
+    """Load a single-band raster with every declared nodata pixel as NaN."""
     with rasterio.open(file_path) as src:
-        arr = src.read(1).astype(np.float32)
+        arr = src.read(1, masked=True).astype(np.float32).filled(np.nan)
         profile = src.profile.copy()
     return arr, profile
+
+
+def _assert_same_grid(left, right, operation: str) -> None:
+    """Require identical raster shape, CRS, and affine grid before pixel algebra."""
+    same_transform = left.transform.almost_equals(right.transform)
+    if (
+        left.width != right.width
+        or left.height != right.height
+        or left.crs != right.crs
+        or not same_transform
+    ):
+        raise ScientificPreconditionError(
+            f"{operation} requires aligned rasters with identical shape, CRS, and transform; "
+            "explicit reprojection/resampling is required first."
+        )
 
 
 def _save_binary_mask(mask: np.ndarray, profile: dict,
@@ -91,35 +108,42 @@ def apply_threshold(file_path: str, threshold_low: float,
                 "threshold": {low, high or None},
                 "pixel_counts": {class_0: int, class_1: int},
                 "percentages": {class_0: float, class_1: float},
-                "total_pixels": int
+                "total_pixels": int,
+                "valid_pixels": int,
+                "nodata_pixels": int
             }
         }
     """
     try:
         arr, profile = _load_index_raster(file_path)
 
-        nodata_mask = np.isnan(arr) if profile.get("nodata") is None \
-                      else (arr == profile["nodata"])
-        arr_clean = np.where(nodata_mask, np.nan, arr)
+        valid_mask = np.isfinite(arr)
+        arr_clean = np.where(valid_mask, arr, np.nan)
 
         if threshold_high is not None:
             # Dual threshold: threshold_low <= value <= threshold_high
-            mask = ((arr_clean >= threshold_low) & (arr_clean <= threshold_high)).astype(np.uint8)
+            selected = (arr_clean >= threshold_low) & (arr_clean <= threshold_high)
             th_desc = f"[{threshold_low}, {threshold_high}]"
         else:
             # Single threshold: value >= threshold_low
-            mask = (arr_clean >= threshold_low).astype(np.uint8)
+            selected = arr_clean >= threshold_low
             th_desc = f">= {threshold_low}"
 
-        masked_pixels = int(np.sum(mask == 1))
-        total_valid = int(np.sum(~np.isnan(arr_clean)))
-        pct = 100 * masked_pixels / total_valid if total_valid > 0 else 0
+        mask = np.full(arr.shape, 255, dtype=np.uint8)
+        mask[valid_mask] = selected[valid_mask].astype(np.uint8)
+        class_0 = int(np.sum(mask == 0))
+        class_1 = int(np.sum(mask == 1))
+        total_valid = int(np.sum(valid_mask))
+        nodata_pixels = int(mask.size - total_valid)
+        pct = 100 * class_1 / total_valid if total_valid > 0 else 0
 
         extra_meta = {
             "threshold": {"low": threshold_low, "high": threshold_high},
-            "pixel_counts": {"class_0": int(np.sum(mask == 0)), "class_1": masked_pixels},
+            "pixel_counts": {"class_0": class_0, "class_1": class_1},
             "percentages": {"class_0": round(100 - pct, 2), "class_1": round(pct, 2)},
-            "total_pixels": total_valid,
+            "total_pixels": int(mask.size),
+            "valid_pixels": total_valid,
+            "nodata_pixels": nodata_pixels,
         }
 
         return _save_binary_mask(mask, profile, output_name, extra_meta)
@@ -158,19 +182,34 @@ def calculate_area(file_path: str, pixel_area_km2: float = None,
     try:
         arr, profile = _load_index_raster(file_path)
 
-        # Derive pixel area from metadata if not provided
+        valid_mask = np.isfinite(arr)
+
+        # Derive pixel area only from a projected CRS with known linear units.
         if pixel_area_km2 is None:
             transform = profile.get("transform")
-            if transform is not None:
-                # Resolution = pixel width/height in map units
-                res_x = abs(transform.a)
-                res_y = abs(transform.e)
-                pixel_area_km2 = (res_x * res_y) / 1_000_000  # m² → km²
-            else:
-                pixel_area_km2 = 0.0001  # fallback: assume 10m × 10m = 0.0001 km²
+            crs = profile.get("crs")
+            if transform is None or crs is None:
+                raise ScientificPreconditionError(
+                    "Area requires raster transform and CRS, or an explicit pixel_area_km2 override."
+                )
+            if not crs.is_projected:
+                raise ScientificPreconditionError(
+                    f"Area cannot be derived from geographic CRS {crs}; reproject to an "
+                    "appropriate projected CRS or provide a verified pixel_area_km2."
+                )
+            unit_name, metres_per_unit = crs.linear_units_factor
+            if not np.isfinite(metres_per_unit) or metres_per_unit <= 0:
+                raise ScientificPreconditionError(
+                    f"Projected CRS linear unit '{unit_name}' has no usable metre conversion."
+                )
+            res_x = abs(transform.a) * metres_per_unit
+            res_y = abs(transform.e) * metres_per_unit
+            pixel_area_km2 = (res_x * res_y) / 1_000_000
+        elif not np.isfinite(pixel_area_km2) or pixel_area_km2 <= 0:
+            raise ScientificPreconditionError("pixel_area_km2 must be a finite positive value.")
 
         if class_values is None:
-            classes = sorted([int(v) for v in np.unique(arr) if not np.isnan(v)])
+            classes = sorted(int(v) for v in np.unique(arr[valid_mask]))
         else:
             classes = class_values
 
@@ -196,10 +235,20 @@ def calculate_area(file_path: str, pixel_area_km2: float = None,
                 "total_area_km2": round(total_area, 4),
                 "total_area_hectares": round(total_area * 100, 2),
                 "pixel_area_km2": pixel_area_km2,
+                "valid_pixels": int(np.sum(valid_mask)),
+                "nodata_pixels": int(arr.size - np.sum(valid_mask)),
+                "crs": str(profile.get("crs")) if profile.get("crs") else None,
             }
         }
     except FileNotFoundError as e:
         return {"success": False, "message": str(e), "data": None}
+    except ScientificPreconditionError as e:
+        return {
+            "success": False,
+            "message": f"Area scientific precondition failed: {e}",
+            "data": None,
+            "error_code": "scientific_precondition_failed",
+        }
     except Exception as e:
         return {"success": False, "message": f"Area calculation failed: {e}", "data": None}
 
@@ -219,14 +268,15 @@ def apply_mask(input_file: str, mask_file: str,
         dict: {success, message, data: {output_path, shape, pixels_retained}}
     """
     try:
-        with rasterio.open(input_file) as src_in:
-            arr_in = src_in.read(1).astype(np.float32)
+        with rasterio.open(input_file) as src_in, rasterio.open(mask_file) as src_mask:
+            _assert_same_grid(src_in, src_mask, "Mask application")
+            arr_in = src_in.read(1, masked=True).astype(np.float32).filled(np.nan)
+            arr_mask = src_mask.read(1, masked=True).astype(np.float32).filled(np.nan)
             profile_in = src_in.profile.copy()
 
-        with rasterio.open(mask_file) as src_mask:
-            arr_mask = src_mask.read(1)
-
-        result = np.where(arr_mask == mask_value, arr_in, nodata_value)
+        retain_mask = np.isfinite(arr_in) & np.isfinite(arr_mask) & (arr_mask == mask_value)
+        result = np.full(arr_in.shape, nodata_value, dtype=np.float32)
+        result[retain_mask] = arr_in[retain_mask]
 
         ts = _get_timestamp()
         fname = f"intermediate_masked_{ts}.tif"
@@ -238,7 +288,7 @@ def apply_mask(input_file: str, mask_file: str,
         with rasterio.open(out_path, "w", **out_profile) as dst:
             dst.write(result[np.newaxis, :, :].astype(np.float32))
 
-        retained = int(np.sum(~np.isnan(result)))
+        retained = int(np.sum(retain_mask))
         total = result.size
         pct = 100 * retained / total if total > 0 else 0
 
@@ -256,6 +306,13 @@ def apply_mask(input_file: str, mask_file: str,
         }
     except FileNotFoundError as e:
         return {"success": False, "message": str(e), "data": None}
+    except ScientificPreconditionError as e:
+        return {
+            "success": False,
+            "message": f"Mask scientific precondition failed: {e}",
+            "data": None,
+            "error_code": "scientific_precondition_failed",
+        }
     except Exception as e:
         return {"success": False, "message": f"Mask application failed: {e}", "data": None}
 
@@ -285,16 +342,13 @@ def zonal_statistics(zone_file: str, value_file: str,
         }
     """
     try:
-        with rasterio.open(zone_file) as src_z:
-            arr_z = src_z.read(1)
-            profile_z = src_z.profile.copy()
-
-        with rasterio.open(value_file) as src_v:
-            arr_v = src_v.read(1).astype(np.float32)
-            profile_v = src_v.profile.copy()
+        with rasterio.open(zone_file) as src_z, rasterio.open(value_file) as src_v:
+            _assert_same_grid(src_z, src_v, "Zonal statistics")
+            arr_z = src_z.read(1, masked=True).astype(np.float32).filled(np.nan)
+            arr_v = src_v.read(1, masked=True).astype(np.float32).filled(np.nan)
 
         if zone_values is None:
-            zones = sorted([int(v) for v in np.unique(arr_z) if not np.isnan(v)])
+            zones = sorted(int(v) for v in np.unique(arr_z[np.isfinite(arr_z)]))
         else:
             zones = zone_values
 
@@ -302,7 +356,7 @@ def zonal_statistics(zone_file: str, value_file: str,
         for zone in zones:
             mask = arr_z == zone
             vals = arr_v[mask]
-            vals = vals[~np.isnan(vals)]
+            vals = vals[np.isfinite(vals)]
             if len(vals) > 0:
                 results[str(zone)] = {
                     "mean": round(float(np.nanmean(vals)), 4),
@@ -319,5 +373,12 @@ def zonal_statistics(zone_file: str, value_file: str,
         }
     except FileNotFoundError as e:
         return {"success": False, "message": str(e), "data": None}
+    except ScientificPreconditionError as e:
+        return {
+            "success": False,
+            "message": f"Zonal-statistics scientific precondition failed: {e}",
+            "data": None,
+            "error_code": "scientific_precondition_failed",
+        }
     except Exception as e:
         return {"success": False, "message": f"Zonal statistics failed: {e}", "data": None}

@@ -16,6 +16,87 @@ from rasterio.io import DatasetReader
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
+
+class ScientificPreconditionError(ValueError):
+    """Raised when data semantics are insufficient for a scientific operation."""
+
+
+def _normalise_band_name(value: str) -> str:
+    """Return a compact, case-insensitive spectral-band identifier."""
+    return "".join(str(value).strip().upper().split())
+
+
+def _resolve_band_reference(
+    src: DatasetReader, band_reference, *, role: str
+) -> tuple[int, str | None, str]:
+    """Resolve a semantic band name or an explicit 1-based stack position.
+
+    Semantic references such as ``B8`` are matched against raster band
+    descriptions. They never fall back to a guessed stack position. Integer
+    references remain available as an explicit expert override and are marked
+    as such in provenance.
+    """
+    if isinstance(band_reference, bool):
+        raise ScientificPreconditionError(
+            f"{role} band reference must be a spectral name or 1-based index, not bool."
+        )
+
+    explicit_index = None
+    if isinstance(band_reference, int):
+        explicit_index = band_reference
+    elif isinstance(band_reference, str) and band_reference.strip().isdigit():
+        explicit_index = int(band_reference.strip())
+
+    if explicit_index is not None:
+        if explicit_index < 1 or explicit_index > src.count:
+            raise ScientificPreconditionError(
+                f"Explicit {role} stack index {explicit_index} is out of range 1-{src.count}."
+            )
+        description = src.descriptions[explicit_index - 1]
+        return explicit_index, description, "explicit_stack_index"
+
+    requested = _normalise_band_name(band_reference)
+    if not requested:
+        raise ScientificPreconditionError(f"A {role} band reference is required.")
+
+    descriptions = [
+        _normalise_band_name(description) if description else ""
+        for description in src.descriptions
+    ]
+    matches = [index + 1 for index, description in enumerate(descriptions) if description == requested]
+    if not any(descriptions):
+        raise ScientificPreconditionError(
+            f"Cannot resolve semantic {role} band '{band_reference}': the raster has no "
+            "band descriptions. Supply a separately verified 1-based stack index explicitly."
+        )
+    if not matches:
+        available = [description for description in src.descriptions if description]
+        raise ScientificPreconditionError(
+            f"Required {role} band '{band_reference}' is absent; available descriptions: {available}."
+        )
+    if len(matches) != 1:
+        raise ScientificPreconditionError(
+            f"Semantic {role} band '{band_reference}' is ambiguous at stack positions {matches}."
+        )
+    index = matches[0]
+    return index, src.descriptions[index - 1], "band_description"
+
+
+def _safe_nodata_for_dtype(value, dtype: str):
+    """Return a representable nodata value, or a safe replacement."""
+    target = np.dtype(dtype)
+    if value is None:
+        return np.nan if np.issubdtype(target, np.floating) else None
+    if np.issubdtype(target, np.floating):
+        if isinstance(value, (float, np.floating)) and np.isnan(value):
+            return np.nan
+        limit = np.finfo(target)
+        return value if np.isfinite(value) and limit.min <= value <= limit.max else np.nan
+    if np.issubdtype(target, np.integer):
+        limit = np.iinfo(target)
+        return int(value) if np.isfinite(value) and limit.min <= value <= limit.max else None
+    return value
+
 def _get_project_root() -> str:
     """Return the ExpertsRS project root (parent of tools/)."""
     return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -132,7 +213,10 @@ def read_raster_metadata(file_path: str = None) -> dict:
                 "count": src.count,
                 "transform": str(src.transform),
                 "res": src.res,
-                "band_descriptions": [str(src.descriptions[i]) or f"Band {i+1}" for i in range(src.count)],
+                "band_descriptions": [
+                    src.descriptions[i] if src.descriptions[i] else f"Band {i+1}"
+                    for i in range(src.count)
+                ],
                 "file_path": abs_path,
                 "file_name": os.path.basename(abs_path),
             }
@@ -334,10 +418,11 @@ def save_raster(data, output_path: str, reference_file: str = None,
         profile["count"] = count
         profile["height"] = height
         profile["width"] = width
-        if nodata is not None:
-            profile["nodata"] = nodata
-        elif "nodata" not in profile:
-            profile["nodata"] = -9999
+        inherited_nodata = profile.get("nodata")
+        profile["nodata"] = _safe_nodata_for_dtype(
+            nodata if nodata is not None else inherited_nodata,
+            profile["dtype"],
+        )
 
         with rasterio.open(output_path, "w", **profile) as dst:
             for i in range(count):

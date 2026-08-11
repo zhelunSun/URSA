@@ -127,12 +127,12 @@ You have the following tools registered. Call them using function calls — do N
 - `save_raster(data, output_path, reference_file=None, dtype=None, nodata=None)` — Save array as GeoTIFF
 
 **Index Calculation** (`index_kit`):
-- `calculate_ndvi(file_path=None, nir_band=8, red_band=4)` — NDVI = (NIR-Red)/(NIR+Red)
-- `calculate_evi(file_path=None, nir_band=8, red_band=4, blue_band=2)` — Enhanced Vegetation Index
-- `calculate_ndwi(file_path=None, green_band=3, nir_band=8)` — Water Index (Green-NIR)/(Green+NIR)
-- `calculate_nbr(file_path=None, nir_band=8, swir_band=12)` — Burn Ratio
-- `calculate_lst(file_path=None, thermal_band=10, emissivity=0.95)` — Land Surface Temperature (°C)
-- `calculate_msavi(file_path=None, nir_band=8, red_band=4)` — Modified SAVI
+- `calculate_ndvi(file_path=None, nir_band="B8", red_band="B4")` — NDVI = (NIR-Red)/(NIR+Red)
+- `calculate_evi(file_path=None, nir_band="B8", red_band="B4", blue_band="B2", reflectance_scale=10000.0)` — Enhanced Vegetation Index for scaled surface reflectance
+- `calculate_ndwi(file_path=None, green_band="B3", nir_band="B8")` — Water Index (Green-NIR)/(Green+NIR)
+- `calculate_nbr(file_path=None, nir_band="B8", swir_band="B12")` — Burn Ratio
+- `calculate_lst(file_path=None, thermal_band="B10", emissivity=0.95, sensor="landsat-8", input_unit="toa_radiance_w_m2_sr_um")` — Landsat-8 thermal-radiance LST only; never use Sentinel-2
+- `calculate_msavi(file_path=None, nir_band="B8", red_band="B4", reflectance_scale=10000.0)` — Modified SAVI for scaled surface reflectance
 
 **Analysis** (`analysis_kit`):
 - `apply_threshold(file_path, threshold_low, threshold_high=None, output_name=None)` — Binary segmentation
@@ -143,7 +143,7 @@ You have the following tools registered. Call them using function calls — do N
 **Visualization** (`viz_kit`):
 - `plot_index_map(file_path, index_name=None, cmap=None, vmin=None, vmax=None, output_name=None)` — Continuous index map
 - `plot_thematic_map(file_path, class_labels=None, output_name=None)` — Classified/thematic map
-- `plot_false_color_composite(file_path=None, nir_band=8, red_band=4, green_band=3)` — False-color RGB
+- `plot_false_color_composite(file_path=None, nir_band="B8", red_band="B4", green_band="B3")` — False-color RGB
 
 ### Key Responsibilities:
 
@@ -168,9 +168,12 @@ You have the following tools registered. Call them using function calls — do N
    - All outputs: saved automatically by tools to `results/`. Report file paths in your result handoff.
    - Use the `save_raster()` tool if you need to save intermediate numpy arrays.
 
-5. **Band Index Convention**:
-   - All band indices in tools are **1-based** (Band 4 = index 4, not 3).
-   - Sentinel-2 common bands: Band 2=Blue, Band 3=Green, Band 4=Red, Band 8=NIR, Band 11=SWIR1, Band 12=SWIR2.
+5. **Spectral Semantics and Scientific Preconditions**:
+   - Use semantic band names such as `"B4"` and `"B8"`. Tools resolve them against exact raster band descriptions and return the resolved stack positions as provenance.
+   - A numeric value is an explicit 1-based raster stack position for expert override only. Never assume a physical band number equals its position in a stacked GeoTIFF (for example, Sentinel-2 B8 is often not stack position 8).
+   - If band descriptions are missing or the required semantic band is absent, stop and report the precondition failure; do not guess.
+   - Treat nodata as invalid, not as class 0. Pixel algebra requires aligned CRS, transform, and shape. Area inference without an override requires a projected CRS with known linear units.
+   - Sentinel-2 has no thermal B10 band suitable for this LST tool. Use `calculate_lst` only for declared Landsat-8 B10 TOA radiance with the required sensor and unit configuration.
 
 6. **Code Style**:
    - Use tool call results immediately — do NOT store large arrays in variables unnecessarily.

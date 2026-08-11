@@ -9,7 +9,12 @@ Output is always float32, saved to results/ automatically.
 import os
 import numpy as np
 import rasterio
-from .io_kit import _ensure_results_dir, _resolve_data_path
+from .io_kit import (
+    ScientificPreconditionError,
+    _ensure_results_dir,
+    _resolve_band_reference,
+    _resolve_data_path,
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -21,17 +26,32 @@ def _get_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d%H%M%S")
 
 
-def _load_two_bands(file_path: str, band_a: int, band_b: int):
-    """Load two bands from a raster file. Returns (arr_a, arr_b, profile).
-
-    band_a and band_b are 1-based, matching both the public tool interface
-    and rasterio's band indexing.
-    """
+def _load_resolved_bands(file_path: str, band_references: dict[str, object]):
+    """Load semantically resolved bands and return arrays, profile, provenance."""
+    arrays = {}
+    selections = {}
     with rasterio.open(file_path) as src:
-        arr_a = src.read(band_a).astype(np.float32)
-        arr_b = src.read(band_b).astype(np.float32)
+        for role, reference in band_references.items():
+            index, description, resolution = _resolve_band_reference(src, reference, role=role)
+            arrays[role] = (
+                src.read(index, masked=True).astype(np.float32).filled(np.nan)
+            )
+            selections[role] = {
+                "requested": reference,
+                "stack_index": index,
+                "description": description,
+                "resolution": resolution,
+            }
         profile = src.profile.copy()
-    return arr_a, arr_b, profile
+    no_signal = np.logical_and.reduce([
+        np.isfinite(array) & (array == 0) for array in arrays.values()
+    ])
+    if np.any(no_signal):
+        arrays = {
+            role: np.where(no_signal, np.nan, array)
+            for role, array in arrays.items()
+        }
+    return arrays, profile, selections
 
 
 def _safe_divide(num, denom, fill_value: float = np.nan) -> np.ndarray:
@@ -45,6 +65,11 @@ def _safe_divide(num, denom, fill_value: float = np.nan) -> np.ndarray:
 def _save_index(arr: np.ndarray, profile: dict, index_name: str,
                  suffix: str = "", metadata: dict = None) -> dict:
     """Save a computed index array as GeoTIFF."""
+    valid = arr[np.isfinite(arr)]
+    if valid.size == 0:
+        raise ScientificPreconditionError(
+            f"{index_name} produced no finite pixels after nodata and denominator checks."
+        )
     ts = _get_timestamp()
     fname = f"intermediate_{index_name.lower()}_{suffix}_{ts}.tif" if suffix \
             else f"intermediate_{index_name.lower()}_{ts}.tif"
@@ -64,11 +89,12 @@ def _save_index(arr: np.ndarray, profile: dict, index_name: str,
         "output_path": out_path,
         "file_name": fname,
         "shape": arr.shape,
-        "min": float(np.nanmin(arr)),
-        "max": float(np.nanmax(arr)),
-        "mean": float(np.nanmean(arr)),
-        "std": float(np.nanstd(arr)),
+        "min": float(np.min(valid)),
+        "max": float(np.max(valid)),
+        "mean": float(np.mean(valid)),
+        "std": float(np.std(valid)),
         "nan_count": int(np.sum(np.isnan(arr))),
+        "valid_pixels": int(valid.size),
         "total_pixels": int(arr.size),
     }
     if metadata:
@@ -82,12 +108,21 @@ def _save_index(arr: np.ndarray, profile: dict, index_name: str,
     }
 
 
+def _scientific_failure(index_name: str, error: Exception) -> dict:
+    return {
+        "success": False,
+        "message": f"{index_name} scientific precondition failed: {error}",
+        "data": None,
+        "error_code": "scientific_precondition_failed",
+    }
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Tools
 # ──────────────────────────────────────────────────────────────────────────────
 
-def calculate_ndvi(file_path: str = None, nir_band: int = 8,
-                   red_band: int = 4) -> dict:
+def calculate_ndvi(file_path: str = None, nir_band: str = "B8",
+                   red_band: str = "B4") -> dict:
     """
     Calculate the Normalized Difference Vegetation Index (NDVI).
 
@@ -96,8 +131,9 @@ def calculate_ndvi(file_path: str = None, nir_band: int = 8,
 
     Args:
         file_path: Path to raster file. Auto-discovers if None.
-        nir_band: 1-based NIR band index (default 8 for Sentinel-2 Band 8).
-        red_band: 1-based Red band index (default 4 for Sentinel-2 Band 4).
+        nir_band: Semantic NIR band name (default B8). A numeric string or int
+                  is treated as an explicit, already-verified 1-based stack index.
+        red_band: Semantic red band name (default B4), or verified stack index.
 
     Returns:
         dict: {
@@ -108,13 +144,10 @@ def calculate_ndvi(file_path: str = None, nir_band: int = 8,
     """
     try:
         abs_path = _resolve_data_path(file_path)
-        arr_nir, arr_red, profile = _load_two_bands(abs_path, nir_band, red_band)
-
-        # Handle nodata
-        nodata = profile.get("nodata")
-        if nodata is not None:
-            arr_nir = np.where(arr_nir == nodata, np.nan, arr_nir)
-            arr_red = np.where(arr_red == nodata, np.nan, arr_red)
+        arrays, profile, selections = _load_resolved_bands(
+            abs_path, {"nir": nir_band, "red": red_band}
+        )
+        arr_nir, arr_red = arrays["nir"], arrays["red"]
 
         numerator = arr_nir - arr_red
         denominator = arr_nir + arr_red
@@ -124,20 +157,22 @@ def calculate_ndvi(file_path: str = None, nir_band: int = 8,
         ndvi = np.clip(ndvi, -1.0, 1.0)
 
         return _save_index(ndvi, profile, "NDVI",
-                           suffix=f"nir{ nir_band}_red{red_band}",
+                           suffix=f"nir{selections['nir']['stack_index']}_red{selections['red']['stack_index']}",
                            metadata={
                                "formula": "NDVI = (NIR - Red) / (NIR + Red)",
-                               "nir_band": nir_band, "red_band": red_band,
-                               "sensor": "Sentinel-2" if nir_band == 8 else "Unknown",
+                               "band_selection": selections,
                            })
     except FileNotFoundError as e:
         return {"success": False, "message": str(e), "data": None}
+    except ScientificPreconditionError as e:
+        return _scientific_failure("NDVI", e)
     except Exception as e:
         return {"success": False, "message": f"NDVI calculation failed: {e}", "data": None}
 
 
-def calculate_evi(file_path: str = None, nir_band: int = 8,
-                   red_band: int = 4, blue_band: int = 2) -> dict:
+def calculate_evi(file_path: str = None, nir_band: str = "B8",
+                  red_band: str = "B4", blue_band: str = "B2",
+                  reflectance_scale: float = 10000.0) -> dict:
     """
     Calculate the Enhanced Vegetation Index (EVI).
 
@@ -146,26 +181,25 @@ def calculate_evi(file_path: str = None, nir_band: int = 8,
 
     Args:
         file_path: Path to raster file. Auto-discovers if None.
-        nir_band: 1-based NIR band index (default 8 for Sentinel-2).
-        red_band: 1-based Red band index (default 4 for Sentinel-2).
-        blue_band: 1-based Blue band index (default 2 for Sentinel-2 Band 2).
+        nir_band: Semantic NIR band name (default B8), or verified stack index.
+        red_band: Semantic red band name (default B4), or verified stack index.
+        blue_band: Semantic blue band name (default B2), or verified stack index.
+        reflectance_scale: Divisor converting stored values to unitless
+                           reflectance. Sentinel-2 L2A integer products use 10000.
 
     Returns:
         dict: {success, message, data}
     """
     try:
         abs_path = _resolve_data_path(file_path)
-        with rasterio.open(abs_path) as src:
-            arr_nir = src.read(nir_band).astype(np.float32)
-            arr_red = src.read(red_band).astype(np.float32)
-            arr_blue = src.read(blue_band).astype(np.float32)
-            profile = src.profile.copy()
-
-        nodata = profile.get("nodata")
-        if nodata is not None:
-            arr_nir = np.where(arr_nir == nodata, np.nan, arr_nir)
-            arr_red = np.where(arr_red == nodata, np.nan, arr_red)
-            arr_blue = np.where(arr_blue == nodata, np.nan, arr_blue)
+        arrays, profile, selections = _load_resolved_bands(
+            abs_path, {"nir": nir_band, "red": red_band, "blue": blue_band}
+        )
+        if not np.isfinite(reflectance_scale) or reflectance_scale <= 0:
+            raise ScientificPreconditionError("reflectance_scale must be finite and positive.")
+        arr_nir = arrays["nir"] / reflectance_scale
+        arr_red = arrays["red"] / reflectance_scale
+        arr_blue = arrays["blue"] / reflectance_scale
 
         evi = 2.5 * (arr_nir - arr_red) / (
             arr_nir + 6 * arr_red - 7.5 * arr_blue + 1
@@ -173,19 +207,24 @@ def calculate_evi(file_path: str = None, nir_band: int = 8,
         evi = np.where(np.isinf(evi), np.nan, evi)
 
         return _save_index(evi, profile, "EVI",
-                           suffix=f"nir{nir_band}_red{red_band}_blue{blue_band}",
+                           suffix=(f"nir{selections['nir']['stack_index']}_"
+                                   f"red{selections['red']['stack_index']}_"
+                                   f"blue{selections['blue']['stack_index']}"),
                            metadata={
                                "formula": "EVI = 2.5 * (NIR - Red) / (NIR + 6*Red - 7.5*Blue + 1)",
-                               "nir_band": nir_band, "red_band": red_band, "blue_band": blue_band,
+                               "band_selection": selections,
+                               "reflectance_scale": reflectance_scale,
                            })
     except FileNotFoundError as e:
         return {"success": False, "message": str(e), "data": None}
+    except ScientificPreconditionError as e:
+        return _scientific_failure("EVI", e)
     except Exception as e:
         return {"success": False, "message": f"EVI calculation failed: {e}", "data": None}
 
 
-def calculate_ndwi(file_path: str = None, green_band: int = 3,
-                    nir_band: int = 8) -> dict:
+def calculate_ndwi(file_path: str = None, green_band: str = "B3",
+                   nir_band: str = "B8") -> dict:
     """
     Calculate the Normalized Difference Water Index (NDWI).
 
@@ -195,38 +234,39 @@ def calculate_ndwi(file_path: str = None, green_band: int = 3,
 
     Args:
         file_path: Path to raster file. Auto-discovers if None.
-        green_band: 1-based Green band index (default 3 for Sentinel-2 Band 3).
-        nir_band: 1-based NIR band index (default 8 for Sentinel-2 Band 8).
+        green_band: Semantic green band name (default B3), or verified stack index.
+        nir_band: Semantic NIR band name (default B8), or verified stack index.
 
     Returns:
         dict: {success, message, data}
     """
     try:
         abs_path = _resolve_data_path(file_path)
-        arr_green, arr_nir, profile = _load_two_bands(abs_path, green_band, nir_band)
-
-        nodata = profile.get("nodata")
-        if nodata is not None:
-            arr_green = np.where(arr_green == nodata, np.nan, arr_green)
-            arr_nir = np.where(arr_nir == nodata, np.nan, arr_nir)
+        arrays, profile, selections = _load_resolved_bands(
+            abs_path, {"green": green_band, "nir": nir_band}
+        )
+        arr_green, arr_nir = arrays["green"], arrays["nir"]
 
         ndwi = _safe_divide(arr_green - arr_nir, arr_green + arr_nir)
         ndwi = np.clip(ndwi, -1.0, 1.0)
 
         return _save_index(ndwi, profile, "NDWI",
-                           suffix=f"green{green_band}_nir{nir_band}",
+                           suffix=(f"green{selections['green']['stack_index']}_"
+                                   f"nir{selections['nir']['stack_index']}"),
                            metadata={
                                "formula": "NDWI = (Green - NIR) / (Green + NIR)",
-                               "green_band": green_band, "nir_band": nir_band,
+                               "band_selection": selections,
                            })
     except FileNotFoundError as e:
         return {"success": False, "message": str(e), "data": None}
+    except ScientificPreconditionError as e:
+        return _scientific_failure("NDWI", e)
     except Exception as e:
         return {"success": False, "message": f"NDWI calculation failed: {e}", "data": None}
 
 
-def calculate_nbr(file_path: str = None, nir_band: int = 8,
-                   swir_band: int = 12) -> dict:
+def calculate_nbr(file_path: str = None, nir_band: str = "B8",
+                  swir_band: str = "B12") -> dict:
     """
     Calculate the Normalized Burn Ratio (NBR).
 
@@ -236,42 +276,44 @@ def calculate_nbr(file_path: str = None, nir_band: int = 8,
 
     Args:
         file_path: Path to raster file. Auto-discovers if None.
-        nir_band: 1-based NIR band index (default 8 for Sentinel-2 Band 8).
-        swir_band: 1-based SWIR band index (default 12 for Sentinel-2 Band 12).
+        nir_band: Semantic NIR band name (default B8), or verified stack index.
+        swir_band: Semantic SWIR band name (default B12), or verified stack index.
 
     Returns:
         dict: {success, message, data}
     """
     try:
         abs_path = _resolve_data_path(file_path)
-        arr_nir, arr_swir, profile = _load_two_bands(abs_path, nir_band, swir_band)
-
-        nodata = profile.get("nodata")
-        if nodata is not None:
-            arr_nir = np.where(arr_nir == nodata, np.nan, arr_nir)
-            arr_swir = np.where(arr_swir == nodata, np.nan, arr_swir)
+        arrays, profile, selections = _load_resolved_bands(
+            abs_path, {"nir": nir_band, "swir": swir_band}
+        )
+        arr_nir, arr_swir = arrays["nir"], arrays["swir"]
 
         nbr = _safe_divide(arr_nir - arr_swir, arr_nir + arr_swir)
         nbr = np.clip(nbr, -1.0, 1.0)
 
         return _save_index(nbr, profile, "NBR",
-                           suffix=f"nir{nir_band}_swir{swir_band}",
+                           suffix=(f"nir{selections['nir']['stack_index']}_"
+                                   f"swir{selections['swir']['stack_index']}"),
                            metadata={
                                "formula": "NBR = (NIR - SWIR) / (NIR + SWIR)",
-                               "nir_band": nir_band, "swir_band": swir_band,
+                               "band_selection": selections,
                            })
     except FileNotFoundError as e:
         return {"success": False, "message": str(e), "data": None}
+    except ScientificPreconditionError as e:
+        return _scientific_failure("NBR", e)
     except Exception as e:
         return {"success": False, "message": f"NBR calculation failed: {e}", "data": None}
 
 
-def calculate_lst(file_path: str = None, thermal_band: int = 10,
-                  emissivity: float = 0.95) -> dict:
+def calculate_lst(file_path: str = None, thermal_band: str = "B10",
+                  emissivity: float = 0.95, sensor: str = None,
+                  input_unit: str = None) -> dict:
     """
     Estimate Land Surface Temperature (LST) from thermal infrared data.
 
-    Single-channel algorithm for Landsat / Sentinel-3:
+    Narrow single-channel algorithm for Landsat 8 Band 10 TOA radiance:
     LST (°C) = BT / (1 + (wavelength * BT / rho) * ln(emissivity)) - 273.15
 
     Where:
@@ -282,58 +324,84 @@ def calculate_lst(file_path: str = None, thermal_band: int = 10,
 
     Args:
         file_path: Path to raster file. Auto-discovers if None.
-        thermal_band: 1-based thermal band index (default 10 for Landsat-8/Sentinel-3).
+        thermal_band: Semantic thermal band name (default B10), or a separately
+                      verified explicit 1-based stack index.
         emissivity: Land surface emissivity (0.0-1.0). Default 0.95 for vegetation.
+        sensor: Must be explicitly set to ``landsat-8``.
+        input_unit: Must be ``toa_radiance_w_m2_sr_um``. Reflectance, raw DN,
+                    and brightness-temperature inputs are not accepted.
 
     Returns:
         dict: {success, message, data}
     """
     try:
         abs_path = _resolve_data_path(file_path)
+        sensor_name = (sensor or "").strip().lower().replace("_", "-")
+        if sensor_name not in {"landsat-8", "landsat8"}:
+            raise ScientificPreconditionError(
+                "LST requires an explicit sensor='landsat-8'. Sentinel-2 has no "
+                "thermal band and must never be routed to this operator."
+            )
+        if input_unit != "toa_radiance_w_m2_sr_um":
+            raise ScientificPreconditionError(
+                "LST requires input_unit='toa_radiance_w_m2_sr_um'; raw DN, "
+                "reflectance, and unspecified units are not radiometrically admissible."
+            )
+        if not 0 < emissivity <= 1:
+            raise ScientificPreconditionError("Emissivity must be in the interval (0, 1].")
+
         with rasterio.open(abs_path) as src:
-            if thermal_band < 1 or thermal_band > src.count:
-                return {
-                    "success": False,
-                    "message": f"Thermal band {thermal_band} out of range (1-{src.count}).",
-                    "data": None
-                }
-            arr = src.read(thermal_band).astype(np.float64)
+            band_index, description, resolution = _resolve_band_reference(
+                src, thermal_band, role="thermal"
+            )
+            arr = src.read(band_index, masked=True).astype(np.float64).filled(np.nan)
             profile = src.profile.copy()
 
-        nodata = profile.get("nodata")
-        if nodata is not None:
-            arr = np.where(arr == nodata, np.nan, arr)
+        if not np.any(np.isfinite(arr) & (arr > 0)):
+            raise ScientificPreconditionError("Thermal radiance contains no finite positive pixels.")
 
-        # Physical constants
-        K1_CONSTANT = 774.89   # For Band 10 (Landsat 8/9)
-        K2_CONSTANT = 1321.08   # For Band 10
-        RHO = 14387.9          # µm·K
+        # Landsat 8 Band 10 constants and units.
+        k1 = 774.8853
+        k2 = 1321.0789
+        wavelength_um = 10.895
+        rho_um_k = 14387.76877
 
-        # Step 1: Convert DN to TOA radiance (if needed — assumes already brightness temp for Sentinel-3)
-        # Step 2: Convert to Brightness Temperature
-        bt = (K2_CONSTANT / np.log(K1_CONSTANT / arr + 1))
+        # Convert TOA spectral radiance to brightness temperature.
+        bt = k2 / np.log(k1 / arr + 1)
 
-        # Step 3: Correct for emissivity and convert to LST
-        # Use emissivity = 0.95 as default
-        lst = bt / (1 + (10.9 * 1e-6 * bt / RHO) * np.log(emissivity)) - 273.15
+        # Correct for emissivity and convert Kelvin to Celsius. Wavelength and
+        # rho intentionally share micrometre units.
+        lst = bt / (1 + (wavelength_um * bt / rho_um_k) * np.log(emissivity)) - 273.15
         lst = np.where(np.isnan(lst) | np.isinf(lst), np.nan, lst)
 
         return _save_index(lst.astype(np.float32), profile, "LST",
-                           suffix=f"band{thermal_band}_e{emissivity}",
+                           suffix=f"band{band_index}_e{emissivity}",
                            metadata={
-                               "formula": "Single-channel LST algorithm (°C)",
-                               "thermal_band": thermal_band,
+                               "formula": "Landsat 8 Band 10 single-channel LST (°C)",
+                               "sensor": "landsat-8",
+                               "input_unit": input_unit,
+                               "band_selection": {
+                                   "thermal": {
+                                       "requested": thermal_band,
+                                       "stack_index": band_index,
+                                       "description": description,
+                                       "resolution": resolution,
+                                   }
+                               },
                                "emissivity": emissivity,
                                "unit": "celsius",
                            })
     except FileNotFoundError as e:
         return {"success": False, "message": str(e), "data": None}
+    except ScientificPreconditionError as e:
+        return _scientific_failure("LST", e)
     except Exception as e:
         return {"success": False, "message": f"LST estimation failed: {e}", "data": None}
 
 
-def calculate_msavi(file_path: str = None, nir_band: int = 8,
-                     red_band: int = 4) -> dict:
+def calculate_msavi(file_path: str = None, nir_band: str = "B8",
+                    red_band: str = "B4",
+                    reflectance_scale: float = 10000.0) -> dict:
     """
     Calculate the Modified Soil-Adjusted Vegetation Index (MSAVI2).
 
@@ -342,31 +410,42 @@ def calculate_msavi(file_path: str = None, nir_band: int = 8,
 
     Args:
         file_path: Path to raster file. Auto-discovers if None.
-        nir_band: 1-based NIR band index (default 8 for Sentinel-2).
-        red_band: 1-based Red band index (default 4 for Sentinel-2).
+        nir_band: Semantic NIR band name (default B8), or verified stack index.
+        red_band: Semantic red band name (default B4), or verified stack index.
+        reflectance_scale: Divisor converting stored values to unitless
+                           reflectance. Sentinel-2 L2A integer products use 10000.
 
     Returns:
         dict: {success, message, data}
     """
     try:
         abs_path = _resolve_data_path(file_path)
-        arr_nir, arr_red, profile = _load_two_bands(abs_path, nir_band, red_band)
+        arrays, profile, selections = _load_resolved_bands(
+            abs_path, {"nir": nir_band, "red": red_band}
+        )
+        if not np.isfinite(reflectance_scale) or reflectance_scale <= 0:
+            raise ScientificPreconditionError("reflectance_scale must be finite and positive.")
+        arr_nir = arrays["nir"] / reflectance_scale
+        arr_red = arrays["red"] / reflectance_scale
 
-        nodata = profile.get("nodata")
-        if nodata is not None:
-            arr_nir = np.where(arr_nir == nodata, np.nan, arr_nir)
-            arr_red = np.where(arr_red == nodata, np.nan, arr_red)
-
-        msavi = (2 * arr_nir + 1 - np.sqrt((2 * arr_nir + 1) ** 2 - 8 * (arr_nir - arr_red))) / 2
+        discriminant = (2 * arr_nir + 1) ** 2 - 8 * (arr_nir - arr_red)
+        msavi = np.where(
+            discriminant >= 0,
+            (2 * arr_nir + 1 - np.sqrt(np.where(discriminant >= 0, discriminant, np.nan))) / 2,
+            np.nan,
+        )
         msavi = np.where(np.isnan(msavi) | np.isinf(msavi), np.nan, msavi)
 
         return _save_index(msavi, profile, "MSAVI",
-                           suffix=f"nir{nir_band}_red{red_band}",
+                           suffix=f"nir{selections['nir']['stack_index']}_red{selections['red']['stack_index']}",
                            metadata={
                                "formula": "MSAVI2 = (2*NIR+1 - sqrt((2*NIR+1)^2 - 8*(NIR-Red))) / 2",
-                               "nir_band": nir_band, "red_band": red_band,
+                               "band_selection": selections,
+                               "reflectance_scale": reflectance_scale,
                            })
     except FileNotFoundError as e:
         return {"success": False, "message": str(e), "data": None}
+    except ScientificPreconditionError as e:
+        return _scientific_failure("MSAVI", e)
     except Exception as e:
         return {"success": False, "message": f"MSAVI calculation failed: {e}", "data": None}
