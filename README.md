@@ -39,7 +39,28 @@ ExpertsRS is built based on [AutoGen](https://github.com/microsoft/autogen), and
 This repository will continue to maintain and improve the public ExpertsRS prototype.
 
 - **v0.2 - Tool-augmented update:** adds standardized remote sensing tools for the Engineer agent, environment-based LLM configuration, dynamic GeoTIFF discovery from `ExpertsRS/data/`, structured outputs under `ExpertsRS/results/`, and tool validation tests.
+- **v0.3 - Static traceable workflow baseline:** adds a framework-independent typed workflow layer beside the published notebook: versioned task/operator contracts, deterministic pre-execution validation, conservative targeted repair or explicit stop, and inspectable JSON execution traces. See [`ExpertsRS/workflow`](./ExpertsRS/workflow). This is the implemented baseline, not the final adaptive Chapter 1 method.
+- **v0.4 - ReAct-style agent loop:** adds a separate AG2/AutoGen entry point where Scientist and Engineer receive each real tool observation before selecting the next action; the published notebook remains unchanged. Run `python react_demo.py` with configured credentials or `python run_react_pilot.py` for the no-API pilot.
 - **v0.1 - Paper prototype:** initial public prototype accompanying the paper.
+
+The Chapter 1 M1 prototype can be checked without an external LLM from
+`ExpertsRS/` with `python run_m1_closeout.py`. This runs the workflow and ReAct
+regressions, checks the 18-name registry and representative tool behavior,
+generates repair/controlled-stop traces, and executes the scripted real-tool
+pilot. Its evidence boundary is
+documented in [`docs/thesis/ch1_m1_closeout_20260807.md`](./docs/thesis/ch1_m1_closeout_20260807.md).
+The reusable evolution, audit, claim and writing-material system is maintained
+at [`docs/thesis/ch1_evidence_system`](./docs/thesis/ch1_evidence_system). The
+audit-identified band mapping and nodata defects were converted into contracts
+and regression fixtures; the regenerated real-tool pilot is admissible only as
+single-fixture diagnostic evidence, not thematic accuracy or method-effect
+evidence. The accepted forward design—adjustable layered planning, a
+progressively materialized Plan–Execution graph, and checkpoint-based local
+recovery—is now implemented as a bounded no-API Chapter 1 mechanism baseline.
+The D2 fixture uses real local tool feedback and a deliberate failure; it is
+not a live-LLM effect experiment.
+The v0.3/v0.4 labels above describe the Chapter 1 baseline surface. The source
+is committed on the baseline branch; a public release tag is still deferred.
 
 ### Tool Modules
 

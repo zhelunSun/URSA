@@ -1,0 +1,225 @@
+{
+  "schema_version": "0.1",
+  "status": "superseded_draft_do_not_use_for_ch1_metrics",
+  "benchmark_id": "expertsrs_benchmark_20_ch1_admission",
+  "purpose": "Archived Sol-high draft retained for provenance. Its scientific-risk and proxy-validity annotations are not the current Chapter 1 runtime gold.",
+  "superseded_reason": "The 2026-08-09 architecture clarification narrowed Chapter 1 evaluation to role handoff, plan/action/observation consistency, graph materialization, terminal state, artifact closure, and local recovery. Rich remote-sensing scientific-risk and claim-validity annotations are Chapter 2 candidates and must not be used to define Chapter 1 runtime success.",
+  "source": {
+    "original_path": "D:/codes/User-centric RS/ExpertsRS/validation_new/benchmark_20.json",
+    "sha256": "595B546B4ADEF7C7F2AD8122296DC60C51343ECFE21903A5D38D817D5A6EFB65",
+    "task_count": 20,
+    "historical_split": {"single_step": 10, "multi_step": 10}
+  },
+  "fixed_modern_context": {
+    "raster": "ExpertsRS/data/Sentinel2_Dongcheng_20230718.tif",
+    "raster_sha256": "557E28C8E947C609DD57E20E7854DF0F775648223F8BC2197BC8297A4C739F9F",
+    "raster_contract": "Sentinel-2, 10 m, EPSG:32650, 10 described bands: B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12",
+    "tool_catalog_size": 18,
+    "evaluation_date": "2026-08-07"
+  },
+  "action_vocabulary": {
+    "execute": "The fixed data and current authorized tool families are sufficient, subject to stated parameters and validation.",
+    "ask_or_downgrade": "The request needs a scientific definition, extra input, or an explicitly weaker proxy before execution.",
+    "controlled_stop": "The requested claim is not supported by the fixed data/tool context and must not be presented as completed."
+  },
+  "researcher_review_priorities": [
+    {
+      "task_ids": [7, 9, 11],
+      "decision": "Whether a transparent but uncalibrated index-threshold proxy may be admitted directly, or must first receive user acceptance.",
+      "current_draft_policy": "Prefer execute only when the runtime explicitly labels the threshold and output as a proxy; ask_or_downgrade remains acceptable.",
+      "why_signoff_matters": "Changing this policy moves three cases between execute and ask, materially changing the headline admission rate."
+    },
+    {
+      "task_ids": [3],
+      "decision": "Whether an absent registered NDSI operator is a controlled-stop condition or authorizes task-specific formula glue code.",
+      "current_draft_policy": "Treat the 18-tool catalog as the authorized execution boundary and stop or ask; do not silently reimplement a missing standardized index."
+    },
+    {
+      "task_ids": [1],
+      "decision": "Whether the standard vegetation false-colour convention may be declared by the system without a user clarification turn.",
+      "current_draft_policy": "Allow execution with the B8/B4/B3 convention disclosed in provenance."
+    }
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "preferred_action": "execute",
+      "acceptable_actions": ["execute", "ask_or_downgrade"],
+      "required_capabilities": ["band_description_resolution", "false_color_visualization"],
+      "required_outputs": ["map"],
+      "must_not_claim": ["A band combination was scientifically verified if stack positions were only guessed."],
+      "audit_note": "Keep the original wording. Declare the selected false-colour convention."
+    },
+    {
+      "id": 2,
+      "preferred_action": "execute",
+      "acceptable_actions": ["execute"],
+      "required_capabilities": ["resolve_B8_and_B4", "calculate_ndvi", "plot_index_map"],
+      "required_outputs": ["index_raster", "map"],
+      "must_not_claim": ["B8/B4 semantics when using unchecked 1-based stack positions."],
+      "audit_note": "Keep. This is a clean supported positive case."
+    },
+    {
+      "id": 3,
+      "preferred_action": "controlled_stop",
+      "acceptable_actions": ["controlled_stop", "ask_or_downgrade"],
+      "required_capabilities": ["resolve_B3_and_B11", "calculate_ndsi"],
+      "required_outputs": ["index_raster", "map"],
+      "must_not_claim": ["NDSI was produced by substituting another registered index."],
+      "audit_note": "The data can support NDSI, but the current 18-tool catalog has no authorized NDSI operator. Preserve as a missing-capability case."
+    },
+    {
+      "id": 4,
+      "preferred_action": "execute",
+      "acceptable_actions": ["execute"],
+      "required_capabilities": ["resolve_B3_and_B8", "calculate_ndwi", "plot_index_map"],
+      "required_outputs": ["index_raster", "map"],
+      "must_not_claim": ["Water classification accuracy from an unvalidated threshold."],
+      "audit_note": "Keep. Distinguish an NDWI map from a validated water mask."
+    },
+    {
+      "id": 5,
+      "preferred_action": "execute",
+      "acceptable_actions": ["execute"],
+      "required_capabilities": ["resolve_B8_B4_B2", "calculate_evi", "plot_index_map"],
+      "required_outputs": ["index_raster", "map"],
+      "must_not_claim": ["Default band numbers are valid without metadata resolution."],
+      "audit_note": "Keep. This is a clean supported positive case after band resolution is fixed."
+    },
+    {
+      "id": 6,
+      "preferred_action": "ask_or_downgrade",
+      "acceptable_actions": ["ask_or_downgrade", "controlled_stop"],
+      "required_capabilities": ["cropland_definition", "validated_land_cover_reference_or_classifier"],
+      "required_outputs": ["mask_raster", "map"],
+      "must_not_claim": ["Vegetation thresholding alone identifies cropland."],
+      "audit_note": "Do not repair the prompt into an easy NDVI task. Preserve it as a scientific-boundary case."
+    },
+    {
+      "id": 7,
+      "preferred_action": "execute",
+      "acceptable_actions": ["execute", "ask_or_downgrade"],
+      "required_capabilities": ["calculate_ndvi", "declared_vegetation_threshold", "plot_thematic_map"],
+      "required_outputs": ["mask_raster", "map"],
+      "must_not_claim": ["A binary NDVI proxy is fractional vegetation cover without calibration."],
+      "audit_note": "Keep. Require the result to be labelled as a declared proxy when appropriate."
+    },
+    {
+      "id": 8,
+      "preferred_action": "ask_or_downgrade",
+      "acceptable_actions": ["ask_or_downgrade", "controlled_stop"],
+      "required_capabilities": ["impervious_surface_definition", "validated_index_or_classifier"],
+      "required_outputs": ["mask_raster", "map"],
+      "must_not_claim": ["A raw spectral-index threshold is a validated impervious-surface map."],
+      "audit_note": "Current tools lack NDBI/IBI and a validated classifier. A proxy requires explicit user acceptance."
+    },
+    {
+      "id": 9,
+      "preferred_action": "execute",
+      "acceptable_actions": ["execute", "ask_or_downgrade"],
+      "required_capabilities": ["calculate_ndwi", "declared_water_threshold", "plot_thematic_map"],
+      "required_outputs": ["mask_raster", "map"],
+      "must_not_claim": ["Small-water or shadow discrimination was validated without reference data."],
+      "audit_note": "Keep as a supported index-to-mask case with explicit limitations."
+    },
+    {
+      "id": 10,
+      "preferred_action": "controlled_stop",
+      "acceptable_actions": ["controlled_stop", "ask_or_downgrade"],
+      "required_capabilities": ["thermal_band", "radiometric_calibration", "emissivity_method"],
+      "required_outputs": ["temperature_raster", "map"],
+      "must_not_claim": ["Sentinel-2 reflectance bands provide direct land-surface temperature."],
+      "audit_note": "A high-value scientific precondition case: the modern fixed raster has no thermal band, even though a generic calculate_lst tool is registered."
+    },
+    {
+      "id": 11,
+      "preferred_action": "execute",
+      "acceptable_actions": ["execute", "ask_or_downgrade"],
+      "required_capabilities": ["calculate_ndvi", "declared_vegetation_threshold", "nodata_safe_area", "projected_crs_area"],
+      "required_outputs": ["mask_raster", "map", "area_statistics"],
+      "must_not_claim": ["Area or cover rate computed from degree units or nodata counted as non-vegetation."],
+      "audit_note": "Keep as the strongest supported multi-step positive case."
+    },
+    {
+      "id": 12,
+      "preferred_action": "ask_or_downgrade",
+      "acceptable_actions": ["ask_or_downgrade", "controlled_stop"],
+      "required_capabilities": ["calculate_ndvi", "calculate_evi", "calculate_ndbi", "calculate_ndwi", "four_layer_composition"],
+      "required_outputs": ["composite_map"],
+      "must_not_claim": ["All four requested layers were completed when NDBI or layer composition is missing."],
+      "audit_note": "The original prompt omits location/date and relies on inherited context. Current tools support only part of the requested workflow."
+    },
+    {
+      "id": 13,
+      "preferred_action": "ask_or_downgrade",
+      "acceptable_actions": ["ask_or_downgrade"],
+      "required_capabilities": ["vegetation_health_operational_definition"],
+      "required_outputs": ["agreed_proxy_artifacts"],
+      "must_not_claim": ["NDVI alone is a complete measure of vegetation health."],
+      "audit_note": "Keep the ambiguity: it tests unresolved-question handling. NDVI/EVI may be offered only as declared proxies."
+    },
+    {
+      "id": 14,
+      "preferred_action": "controlled_stop",
+      "acceptable_actions": ["controlled_stop", "ask_or_downgrade"],
+      "required_capabilities": ["thermal_observation", "uhi_reference_definition"],
+      "required_outputs": ["temperature_or_uhi_raster", "map"],
+      "must_not_claim": ["NDBI, albedo, or reflectance alone demonstrates urban heat-island hotspots."],
+      "audit_note": "Requires thermal data and a reference/background definition; the fixed Sentinel-2 raster is insufficient."
+    },
+    {
+      "id": 15,
+      "preferred_action": "controlled_stop",
+      "acceptable_actions": ["controlled_stop", "ask_or_downgrade"],
+      "required_capabilities": ["road_reference_or_segmentation_model", "resolution_suitability"],
+      "required_outputs": ["road_network_vector_or_mask", "map"],
+      "must_not_claim": ["Generic edges or low-NDVI pixels constitute a road network."],
+      "audit_note": "Sentinel-2 at 10 m and the current tool catalog are insufficient for a reliable urban road network."
+    },
+    {
+      "id": 16,
+      "preferred_action": "ask_or_downgrade",
+      "acceptable_actions": ["ask_or_downgrade", "controlled_stop"],
+      "required_capabilities": ["buffer_distance_definition", "polygon_or_proximity_mask", "calculate_ndvi"],
+      "required_outputs": ["local_green_space_map"],
+      "must_not_claim": ["The supplied polygon defines 'near' without an agreed buffer or analysis zone."],
+      "audit_note": "The grammar may later be normalized, but the substantive missing buffer definition must remain visible. Current tools lack the spatial subsetting operation."
+    },
+    {
+      "id": 17,
+      "preferred_action": "controlled_stop",
+      "acceptable_actions": ["controlled_stop", "ask_or_downgrade"],
+      "required_capabilities": ["terrain", "drainage", "rainfall_or_hydrologic_context"],
+      "required_outputs": ["flood_accumulation_susceptibility_map"],
+      "must_not_claim": ["A water index from one date is a floodwater-accumulation potential model."],
+      "audit_note": "Preserve as a missing-data and inappropriate-proxy case."
+    },
+    {
+      "id": 18,
+      "preferred_action": "controlled_stop",
+      "acceptable_actions": ["controlled_stop", "ask_or_downgrade"],
+      "required_capabilities": ["impervious_surface_map", "dem_or_slope", "minimum_area", "accessibility_and_safety_criteria"],
+      "required_outputs": ["candidate_sites", "suitability_report"],
+      "must_not_claim": ["Spectral flatness means terrain flatness or emergency suitability."],
+      "audit_note": "The prompt also relies on inherited scene context. It is a strong compound-constraint stop case."
+    },
+    {
+      "id": 19,
+      "preferred_action": "ask_or_downgrade",
+      "acceptable_actions": ["ask_or_downgrade", "controlled_stop"],
+      "required_capabilities": ["built_up_definition", "open_space_definition", "validated_land_cover_method"],
+      "required_outputs": ["classified_raster", "map"],
+      "must_not_claim": ["Non-built pixels are automatically valid open space."],
+      "audit_note": "Requires class definitions and a land-cover method absent from the current tool catalog."
+    },
+    {
+      "id": 20,
+      "preferred_action": "controlled_stop",
+      "acceptable_actions": ["controlled_stop", "ask_or_downgrade"],
+      "required_capabilities": ["thermal_observation", "vegetation_measure", "comparative_or_causal_design", "confounder_control"],
+      "required_outputs": ["effect_estimate", "uncertainty", "report"],
+      "must_not_claim": ["A single-date NDVI association demonstrates heat-island mitigation caused by greening."],
+      "audit_note": "Preserve as the strongest scientific-claim boundary case; it belongs to stop/escalate under the fixed Chapter 1 context."
+    }
+  ]
+}

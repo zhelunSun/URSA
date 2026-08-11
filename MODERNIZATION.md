@@ -1,5 +1,16 @@
 # Ch1 Modernization Plan — 从 AutoGen StateFlow 到现代化架构
 
+> **历史探索文件（2026-08-09 标记）：** 本文件保留 2026-06 时的 EurekAgent 对照与工程想法，
+> 不再是当前执行计划。当前唯一方法/范围入口为
+> [`docs/thesis/ch1_evidence_system/README.md`](docs/thesis/ch1_evidence_system/README.md)，
+> 当前方向已收束为可调整的分层规划、随执行更新的过程图与基于检查点的局部恢复；
+> 不按本文件的功能清单自动扩建 runtime。
+
+> 原四状态 StateFlow 继续作为已发表系统和当前 notebook 的历史基线。升级后的
+> “规划—执行—反馈—恢复”闭环在论文叙事上承接它。2026-08-11 的 D2 无 API 小样已贯通
+> 计划版本、真实工具反馈、过程图、检查点局部恢复与最小权限拒绝；原 StateFlow 仍保留为
+> 历史基线，尚未被真实 LLM 运行路径完全替换。
+
 > 参考: EurekAgent (arXiv:2606.13662, THU-Team-Eureka, 2026-06)
 > 状态: 计划中 | 优先级: CH1-P1 | 不阻塞当前实验
 > **本文件提供背景信息和参考方向，具体实现方案由接手 Agent 自行判断。**

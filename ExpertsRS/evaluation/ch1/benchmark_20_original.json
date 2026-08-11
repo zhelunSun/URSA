@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "request": "I would like to show the remote sensing image with false color of Dongcheng District, Beijing, in summer 2023.",
+    "category": "single step",
+    "context": ""
+  },
+  {
+    "id": 2,
+    "request": "I am from the urban planning department, I would like to map the NDVI of Dongcheng District, Beijing, in summer 2023.",
+    "category": "single step",
+    "context": ""
+  },
+  {
+    "id": 3,
+    "request": "I am from urban planning department, I would like to map the NDSI of Dongcheng District, Beijing, in summer 2023.",
+    "category": "single step",
+    "context": ""
+  },
+  {
+    "id": 4,
+    "request": "I am from urban planning department, I would like to map the NDWI of Dongcheng District, Beijing, in summer 2023.",
+    "category": "single step",
+    "context": ""
+  },
+  {
+    "id": 5,
+    "request": "I am from urban planning department, I would like to map the EVI of Dongcheng District, Beijing, in summer 2023.",
+    "category": "single step",
+    "context": ""
+  },
+  {
+    "id": 6,
+    "request": "I am from urban planning department, I would like to visualize the cropland area of Dongcheng District, Beijing, in 2023.",
+    "category": "single step",
+    "context": ""
+  },
+  {
+    "id": 7,
+    "request": "I am from the urban greening department, I would like to visualize the vegetation coverage of Dongcheng District, Beijing, in summer 2023.",
+    "category": "single step",
+    "context": ""
+  },
+  {
+    "id": 8,
+    "request": "I am from the environmental protection department, I would like to map the impervious surface of Dongcheng District, Beijing, in summer 2023.",
+    "category": "single step",
+    "context": ""
+  },
+  {
+    "id": 9,
+    "request": "I am from the urban water conservancy department, I would like to map the surface water bodies in Dongcheng District, Beijing, in summer 2023.",
+    "category": "single step",
+    "context": ""
+  },
+  {
+    "id": 10,
+    "request": "I am from the meteorological department, I would like to derive the land surface temperature (LST) of Dongcheng District, Beijing, in summer 2023.",
+    "category": "single step",
+    "context": ""
+  },
+  {
+    "id": 11,
+    "request": "I am from the urban greening department, I would like to visualize the vegetation coverage and calculate the green cover rate of Dongcheng District, Beijing, in summer 2023.",
+    "category": "multi step",
+    "context": ""
+  },
+  {
+    "id": 12,
+    "request": "For a general overview, I'd like a single map that combines four layers from the Sentinel composite: vegetation health (NDVI, EVI), built-up areas (NDBI), and water bodies (NDWI).",
+    "category": "multi step",
+    "context": ""
+  },
+  {
+    "id": 13,
+    "request": "I am from the urban greening department, I want to know the health condition of urban vegetation in Dongcheng District, Beijing, in summer 2023.",
+    "category": "multi step",
+    "context": ""
+  },
+  {
+    "id": 14,
+    "request": "I am from the public health department, I would like to identify urban heat island hotspots in Dongcheng District, Beijing, in summer 2023.",
+    "category": "multi step",
+    "context": ""
+  },
+  {
+    "id": 15,
+    "request": "I am from the transportation department, I would like to map the road networks in Dongcheng District, Beijing, in summer 2023 using Sentinel-2 data",
+    "category": "multi step",
+    "context": ""
+  },
+  {
+    "id": 16,
+    "request": "I am from the cultural heritage department, I would like to visualize green space distribution near historical sites in palace museum, Beijing, in summer 2023.",
+    "category": "multi step",
+    "context": "The location of palace museum is: 0: [116.39157392133369,39.92289319205533] 1: [116.39204756376512,39.91299244211205] 2: [116.40246526357896,39.91332983964391] 3: [116.40199415235045,39.92320777401408] 4: [116.39157392133369,39.92289319205533]"
+  },
+  {
+    "id": 17,
+    "request": "I am from the disaster management department, I would like to detect potential floodwater accumulation zones in Dongcheng District, Beijing, in summer 2023.",
+    "category": "multi step",
+    "context": ""
+  },
+  {
+    "id": 18,
+    "request": "I'm with the Emergency Response Command Center. Please first identify all large, flat impervious surfaces (like plazas and parking lots) from the Sentinel composite and then assess their suitability as potential emergency relief staging areas.",
+    "category": "multi step",
+    "context": ""
+  },
+  {
+    "id": 19,
+    "request": "I am from the environmental monitoring department, I would like to map built-up areas and open space distribution in Dongcheng District, Beijing, in summer 2023.",
+    "category": "multi step",
+    "context": ""
+  },
+  {
+    "id": 20,
+    "request": "I am from the urban greening department, I want to evaluate the mitigation of urban heat island effect derived by urban greening in Dongcheng District, Beijing, in summer 2023.",
+    "category": "multi step",
+    "context": ""
+  }
+]

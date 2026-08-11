@@ -42,5 +42,10 @@ Thumbs.db
 *.json
 earthengine
 
+# Frozen Chapter 1 evaluation inputs (safe, reviewed repository assets)
+!ExpertsRS/evaluation/
+!ExpertsRS/evaluation/ch1/
+!ExpertsRS/evaluation/ch1/*.json
+
 # WorkBuddy private state (memory, automations)
 .workbuddy/
