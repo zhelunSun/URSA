@@ -1,0 +1,259 @@
+{
+  "schema_version": "1.0",
+  "status": "frozen_candidate_panel_no_api",
+  "benchmark_id": "expertsrs_ch1_d3_light_v1",
+  "purpose": "A five-task matched panel for testing Chapter 1 runtime mechanisms with a live LLM. It does not score remote-sensing thematic accuracy or Chapter 2 scientific knowledge.",
+  "source": {
+    "benchmark_id": "expertsrs_benchmark_20_original",
+    "path": "ExpertsRS/evaluation/ch1/benchmark_20_original.json",
+    "selected_task_ids": [2, 3, 10, 11, 13],
+    "selection_count": 5,
+    "original_task_count": 20,
+    "prompt_policy": "The request and context fields are copied exactly from the frozen source and must not be normalized in the comparison track."
+  },
+  "selection_policy": {
+    "principle": "Use the smallest panel that covers a clean success, a missing tool, a data precondition stop, a multi-step recovery, and a user clarification boundary.",
+    "excluded_by_default": "Tasks whose main difficulty is scientific proxy validity, causal inference, thematic accuracy, or absent external data are reserved for Chapters 2 or 3 unless used only as an explicitly labelled terminal-state fixture.",
+    "balance": {
+      "single_step": 3,
+      "multi_step": 2,
+      "complete_without_seeded_failure": 1,
+      "controlled_stop": 2,
+      "complete_with_seeded_recovery": 1,
+      "needs_user_clarification": 1
+    }
+  },
+  "fixed_context": {
+    "raster": "ExpertsRS/data/Sentinel2_Dongcheng_20230718.tif",
+    "raster_sha256": "557E28C8E947C609DD57E20E7854DF0F775648223F8BC2197BC8297A4C739F9F",
+    "tool_catalog_size": 18,
+    "roles": ["Manager", "Scientist", "Engineer", "Executor"],
+    "matching_rule": "Use the same model, system prompts outside the tested mechanism, tool catalog, raster, context, turn budget, tool budget, timeout, and output requirements for all conditions."
+  },
+  "conditions": {
+    "B1_static": {
+      "label": "static upfront plan",
+      "mechanisms": ["TaskSpec", "WorkflowGraph", "validator", "controlled_stop"],
+      "plan_revision_after_tool_observation": false,
+      "process_graph_from_run_facts": false,
+      "checkpoint_recovery": false
+    },
+    "B2_adaptive": {
+      "label": "observation-driven plan revision",
+      "mechanisms": ["PlanVersion", "real_tool_observation", "process_graph"],
+      "plan_revision_after_tool_observation": true,
+      "process_graph_from_run_facts": true,
+      "checkpoint_recovery": false
+    },
+    "B3_checkpoint": {
+      "label": "adaptive execution with logical checkpoints",
+      "mechanisms": ["PlanVersion", "real_tool_observation", "process_graph", "Checkpoint"],
+      "plan_revision_after_tool_observation": true,
+      "process_graph_from_run_facts": true,
+      "checkpoint_recovery": true
+    }
+  },
+  "global_scoring_contract": {
+    "primary_dimensions": {
+      "execution_closure": "The run ends with all task-contract artifacts or an allowed explicit terminal state; false success is always incorrect.",
+      "plan_action_consistency": "Each proposed tool action is supported by the current plan and prior observations.",
+      "observation_driven_revision": "When a task fixture supplies new failure or capability evidence, only the affected plan region is revised and the trigger is referenced.",
+      "trace_graph_completeness": "Required plans, actions, observations, artifacts, terminal state, and available semantic relations are reconstructable from the run record.",
+      "recovery_locality": "For the seeded failure task, count upstream tool calls repeated after the last valid checkpoint and verify that only validated artifacts are reused."
+    },
+    "secondary_measures": [
+      "api_tokens",
+      "model_turns",
+      "tool_calls",
+      "wall_time_seconds",
+      "plan_revision_count",
+      "human_clarification_count"
+    ],
+    "never_score_as_chapter1_gold": [
+      "vegetation threshold scientific validity",
+      "pixel-level thematic accuracy",
+      "general remote-sensing knowledge quality",
+      "causal or policy claim validity"
+    ]
+  },
+  "tasks": [
+    {
+      "source_task_id": 2,
+      "request": "I am from the urban planning department, I would like to map the NDVI of Dongcheng District, Beijing, in summer 2023.",
+      "category": "single step",
+      "context": "",
+      "panel_role": "clean_supported_control",
+      "selection_reason": "A supported single-step task that checks ordinary completion and the overhead of adaptive mechanisms when no recovery is needed.",
+      "fixture": {"kind": "none"},
+      "chapter1_contract": {
+        "allowed_terminal_by_condition": {
+          "B1_static": ["completed"],
+          "B2_adaptive": ["completed"],
+          "B3_checkpoint": ["completed"]
+        },
+        "required_artifact_types": ["index_raster", "map"],
+        "required_runtime_evidence": ["B8/B4 metadata resolution", "NDVI tool observation", "artifact paths", "final status"],
+        "forbidden_success_behaviors": ["guessing stack positions without metadata", "claiming completion without both artifacts"],
+        "out_of_scope": ["vegetation classification accuracy"]
+      }
+    },
+    {
+      "source_task_id": 3,
+      "request": "I am from urban planning department, I would like to map the NDSI of Dongcheng District, Beijing, in summer 2023.",
+      "category": "single step",
+      "context": "",
+      "panel_role": "missing_registered_tool",
+      "selection_reason": "Separates honest capability closure from false success: the fixed catalog has no registered NDSI operator.",
+      "fixture": {"kind": "fixed_tool_catalog_boundary"},
+      "chapter1_contract": {
+        "allowed_terminal_by_condition": {
+          "B1_static": ["controlled_stop"],
+          "B2_adaptive": ["controlled_stop"],
+          "B3_checkpoint": ["controlled_stop"]
+        },
+        "required_artifact_types": [],
+        "required_runtime_evidence": ["missing operator recorded", "no substitute operator executed", "explicit final status"],
+        "forbidden_success_behaviors": ["substituting NDVI/NDWI", "silently generating custom formula code", "reporting an NDSI artifact"],
+        "out_of_scope": ["whether a future authorized NDSI implementation is scientifically adequate"]
+      }
+    },
+    {
+      "source_task_id": 10,
+      "request": "I am from the meteorological department, I would like to derive the land surface temperature (LST) of Dongcheng District, Beijing, in summer 2023.",
+      "category": "single step",
+      "context": "",
+      "panel_role": "data_precondition_stop",
+      "selection_reason": "Tests whether real metadata prevents false execution when the fixed Sentinel-2 raster lacks a thermal band.",
+      "fixture": {"kind": "fixed_data_precondition"},
+      "chapter1_contract": {
+        "allowed_terminal_by_condition": {
+          "B1_static": ["controlled_stop"],
+          "B2_adaptive": ["controlled_stop"],
+          "B3_checkpoint": ["controlled_stop"]
+        },
+        "required_artifact_types": [],
+        "required_runtime_evidence": ["metadata or validator evidence", "missing thermal precondition", "explicit final status"],
+        "forbidden_success_behaviors": ["treating the tenth stack position as Sentinel-2 thermal B10", "reporting an LST raster"],
+        "out_of_scope": ["general LST methodology comparison"]
+      }
+    },
+    {
+      "source_task_id": 11,
+      "request": "I am from the urban greening department, I would like to visualize the vegetation coverage and calculate the green cover rate of Dongcheng District, Beijing, in summer 2023.",
+      "category": "multi step",
+      "context": "",
+      "panel_role": "multi_step_seeded_recovery",
+      "selection_reason": "The strongest currently supported multi-step chain and the only task used to estimate the incremental effect of plan revision and checkpoint reuse.",
+      "fixture": {
+        "kind": "seeded_transient_tool_failure",
+        "applies_to_all_conditions": true,
+        "injection_point": "the first apply_threshold call after a successful NDVI artifact",
+        "injected_observation": {
+          "success": false,
+          "error_code": "fixture_transient_write_failure",
+          "message": "Seeded D3-light fixture: the first threshold write failed before producing a mask."
+        },
+        "single_use": true,
+        "scientific_semantics_changed": false
+      },
+      "chapter1_contract": {
+        "allowed_terminal_by_condition": {
+          "B1_static": ["controlled_stop"],
+          "B2_adaptive": ["completed"],
+          "B3_checkpoint": ["completed"]
+        },
+        "required_artifact_types_on_completion": ["index_raster", "mask_raster", "map", "area_statistics"],
+        "required_runtime_evidence": ["NDVI artifact before failure", "seeded failure observation", "terminal state", "plan revision for B2/B3", "checkpoint and reused NDVI reference for B3"],
+        "recovery_locality_expectation": {
+          "B1_static": "No recovery mechanism; stop explicitly after the injected failure.",
+          "B2_adaptive": "Revise the affected plan and retry. It may reuse an observed valid artifact within the run, but must not claim checkpoint-backed recovery.",
+          "B3_checkpoint": "Resume from the post-NDVI checkpoint, reuse the validated NDVI artifact, and do not recompute NDVI."
+        },
+        "forbidden_success_behaviors": ["hiding the injected failure", "marking a missing mask as completed", "claiming checkpoint reuse in B1/B2"],
+        "out_of_scope": ["scientific validity of a fixed vegetation threshold", "green-cover thematic accuracy"]
+      }
+    },
+    {
+      "source_task_id": 13,
+      "request": "I am from the urban greening department, I want to know the health condition of urban vegetation in Dongcheng District, Beijing, in summer 2023.",
+      "category": "multi step",
+      "context": "",
+      "panel_role": "manager_clarification_boundary",
+      "selection_reason": "Preserves the user-facing character of the original system and tests whether an unresolved term is routed to Manager rather than silently converted into an index.",
+      "fixture": {"kind": "unresolved_user_definition", "term": "health condition"},
+      "chapter1_contract": {
+        "allowed_terminal_by_condition": {
+          "B1_static": ["needs_user_clarification"],
+          "B2_adaptive": ["needs_user_clarification"],
+          "B3_checkpoint": ["needs_user_clarification"]
+        },
+        "required_artifact_types": [],
+        "required_runtime_evidence": ["unresolved question", "Manager clarification request", "no analytical tool action before clarification", "explicit final status"],
+        "forbidden_success_behaviors": ["silently defining health as NDVI", "executing an index before the user decision", "reporting vegetation health"],
+        "out_of_scope": ["the scientifically correct operational definition of vegetation health"]
+      }
+    }
+  ],
+  "run_gate": {
+    "api_calls_authorized": false,
+    "required_before_api": [
+      "validate the panel against the frozen 20-task source",
+      "freeze the evaluator without exposing task contracts to tested agents",
+      "choose model and sampling configuration",
+      "set per-run turn/tool/token/time budgets",
+      "decide whether the first pass is 15 single runs or a repeated matched experiment"
+    ]
+  },
+  "proposed_run_protocol": {
+    "status": "frozen_no_api_candidate",
+    "model_selection": {
+      "provider_env": "DEEPSEEK_API_KEY",
+      "model_env": "DEEPSEEK_MODEL",
+      "default_model": "deepseek-ai/DeepSeek-V3",
+      "rationale": "This is the existing tool-capable ReAct default; using it for B1/B2/B3 avoids conflating mechanism effects with a model change.",
+      "single_model_only": true
+    },
+    "sampling": {
+      "temperature": 0,
+      "top_p": 1,
+      "seed_policy": "Record provider-supported seed when available; otherwise record seed_unavailable and keep temperature 0.",
+      "cache_seed": null,
+      "cache_policy": "Disable framework response caching for every live run; cache reuse would make token and latency comparisons invalid."
+    },
+    "per_run_budget": {
+      "max_groupchat_rounds": 30,
+      "max_model_turns": 12,
+      "max_tool_calls": 10,
+      "max_tool_calls_scientist": 4,
+      "max_tool_calls_engineer": 6,
+      "max_wall_time_seconds": 300,
+      "max_completion_tokens": 6000,
+      "max_total_tokens_recorded": 18000,
+      "max_retries_per_model_call": 0,
+      "max_retries_per_tool_call": 0
+    },
+    "execution_policy": {
+      "run_count": 15,
+      "order": "Generate all 15 case identifiers first, then execute in a seeded balanced order across conditions; record the order.",
+      "write_root": "ExpertsRS/results/ch1_d3_light/<run_id>",
+      "overwrite_policy": "never_overwrite",
+      "fixture_policy": "The external evaluator injects the task-11 failure exactly once after an observed successful NDVI artifact; no fixture is included in Agent messages.",
+      "human_input_policy": "No human answer is supplied during a run. A Manager clarification request is the terminal state for task 13.",
+      "failure_policy": "On budget, timeout, API, tool, or protocol failure, emit a structured terminal state and preserve the partial trace. Do not silently retry or replace a run."
+    },
+    "provenance_required": [
+      "git_commit",
+      "panel_sha256",
+      "prompt_sha256",
+      "orchestration_sha256",
+      "tool_registry_sha256",
+      "python_version",
+      "autogen_version",
+      "model_identifier",
+      "provider_base_url_redacted",
+      "sampling_configuration",
+      "actual_usage_metadata",
+      "wall_time_seconds"
+    ]
+  }
+}

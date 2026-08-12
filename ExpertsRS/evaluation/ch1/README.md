@@ -106,6 +106,53 @@ tasks are too few to claim broad statistical superiority; they are a regression
 panel and continuity bridge to the original paper. A small matched subset is
 enough for the first adaptive-path pilot.
 
+## D3-light five-task panel
+
+`d3_light_panel_v1.json` freezes a five-task candidate panel selected directly
+from the unchanged 20 requests:
+
+| Source ID | Runtime role | Why it remains in Chapter 1 |
+| ---: | --- | --- |
+| 2 | clean supported control | Measures ordinary artifact closure and adaptive overhead without a seeded failure |
+| 3 | missing registered tool | Tests explicit capability stop and prevents false substitution |
+| 10 | data-precondition stop | Tests whether real metadata prevents a false LST success |
+| 11 | multi-step seeded recovery | Isolates plan revision and checkpoint reuse after one operational, non-scientific failure |
+| 13 | Manager clarification boundary | Tests user-facing unresolved-question routing without deciding what “vegetation health” scientifically means |
+
+The panel does not edit the original prompts. It compares three matched
+conditions: `B1_static`, `B2_adaptive`, and `B3_checkpoint`. Only task 11 has a
+seeded failure: the first threshold write fails after NDVI succeeds. This leaves
+the scientific method unchanged and makes recovery locality observable.
+
+The JSON includes expected terminal states and required runtime evidence, but
+these contracts belong to the external evaluator. They must not be inserted
+into an Agent prompt or otherwise leak into the tested trajectory. The panel is
+currently `frozen_candidate_panel_no_api`; selecting it does not authorize API
+calls or promote any effect claim.
+
+## D3-light run protocol (frozen, no API)
+
+The single runner and external scorer have been exercised across all 15 slots
+using a deterministic substitute for the decision model. This proves that the
+case matrix, one seeded operational failure, terminal states, artifact checks,
+plan-revision/checkpoint expectations, graph construction, and evaluator
+separation fit together. It does **not** substitute for a real-model run.
+
+The proposed live configuration is deliberately conservative: one existing
+tool-capable model family (`DEEPSEEK_MODEL`, default
+`deepseek-ai/DeepSeek-V3`), temperature `0`, no response cache, 30 group-chat
+rounds, 12 model turns, 10 total tool calls, 300 seconds, 6,000 completion
+tokens and 18,000 recorded tokens per run. Model and tool retries are zero:
+network/API failures become recorded terminal outcomes rather than hidden
+replacement runs. The exact values, hashes, versions, usage metadata and wall
+time are emitted in each planned run manifest.
+
+The future live provider remains intentionally unimplemented. It must implement
+the runner's small decision interface while preserving the existing
+Manager–Scientist–Engineer–Executor routing; it may not expose fixtures or
+scoring contracts to the agents. Live calls require two separate approvals:
+the frozen JSON gate and a local environment flag. Both are currently closed.
+
 ## Relationship to the historical Table 2
 
 Retain the original columns as historical vocabulary, with tighter modern
@@ -149,10 +196,11 @@ Completed locally on 2026-08-07:
 
 Before spending material API budget:
 
-1. Map current static workflow, ReAct, trace, repair, and stop assets to the
-   three frozen research objects and record the implementation gaps.
-2. Define one minimal path from provisional plan through real observation,
-   revision, graph update, and checkpoint branch/stop.
-3. Run a small matched live-LLM subset comparing the original conversational
-   path, static upfront graph, and adaptive path before deciding whether all 20
-   tasks need live execution.
+1. Implement one matched runner for the already frozen `B1/B2/B3` contracts;
+   do not maintain three unrelated scripts.
+2. Keep the evaluator view outside Agent context and dry-run all 15 case slots
+   with deterministic or fake-model responses.
+3. Freeze the live model, sampling configuration, prompts, per-run budgets,
+   timeout and retry policy, then obtain explicit approval for API use.
+4. Run the 15-case live integration smoke before deciding whether three
+   repeated runs (45 total) or any expansion beyond the five tasks is justified.

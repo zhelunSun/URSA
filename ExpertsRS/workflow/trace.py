@@ -128,10 +128,14 @@ class WorkflowTrace:
         action_id: str,
         uri: str,
         validated: bool,
+        artifact_type: str | None = None,
     ) -> str:
+        payload = {"uri": uri, "validated": validated}
+        if artifact_type is not None:
+            payload["artifact_type"] = artifact_type
         return self.record(
             "artifact_recorded",
-            {"uri": uri, "validated": validated},
+            payload,
             actor=actor,
             object_id=artifact_id,
             references=(EventReference(action_id, "produced_by"),),
