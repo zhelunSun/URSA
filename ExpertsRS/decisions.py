@@ -10,6 +10,42 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from pydantic import ValidationError
+
+from .models import (
+    EngineerActionDecision,
+    EngineerHandoffDecision,
+    EngineerReviseDecision,
+    EngineerStopDecision,
+    ManagerClarifyDecision,
+    ManagerHandoffDecision,
+    ScientistPlanDecision,
+    ScientistStopDecision,
+)
+
+
+ROLE_DECISION_MODELS: dict[str, tuple[type[Any], ...]] = {
+    "Manager": (ManagerClarifyDecision, ManagerHandoffDecision),
+    "Scientist": (ScientistPlanDecision, ScientistStopDecision),
+    "Engineer": (EngineerActionDecision, EngineerHandoffDecision, EngineerStopDecision, EngineerReviseDecision),
+}
+
+
+def parse_role_decision(role: str, payload: Any) -> dict[str, Any]:
+    """Validate a model response against the narrow decision contract for its role."""
+    if not isinstance(payload, dict):
+        raise ValueError("decision must be a JSON object")
+    models = ROLE_DECISION_MODELS.get(role)
+    if models is None:
+        raise ValueError(f"Unknown role: {role}")
+    failures: list[str] = []
+    for model in models:
+        try:
+            return model.model_validate(payload).model_dump(mode="json")
+        except ValidationError as error:
+            failures.append(str(error))
+    raise ValueError(f"invalid {role} decision: {'; '.join(failures)}")
+
 
 class DecisionProvider(Protocol):
     """Return one structured, auditable decision for a named runtime role."""
@@ -46,6 +82,12 @@ class ScriptedDecisionProvider:
         observations = state.get("observations", [])
         phase = state.get("phase", "initial")
 
+        def artifact_ref(artifact_type: str) -> list[str]:
+            for observation in reversed(observations):
+                if observation.get("artifact_type") == artifact_type and isinstance(observation.get("artifact_id"), str):
+                    return [observation["artifact_id"]]
+            return []
+
         if role == "Manager":
             if operation in {"clarify_health", "clarify_scope"} and not state.get("user_answers"):
                 return {
@@ -72,28 +114,28 @@ class ScriptedDecisionProvider:
             last = observations[-1] if observations else {}
             if operation == "lst":
                 if not successes:
-                    return {"kind": "action", "tool": "read_raster_metadata"}
+                    return {"kind": "action", "tool_name": "read_raster_metadata"}
                 return {
                     "kind": "stop",
                     "reason": "Thermal precondition failed: LST requires Landsat-8 Band 10 TOA radiance; the supplied Sentinel-2 raster is not admissible.",
                 }
             if not successes:
-                return {"kind": "action", "tool": "read_raster_metadata"}
+                return {"kind": "action", "tool_name": "read_raster_metadata"}
             if "calculate_ndvi" not in successes:
-                return {"kind": "action", "tool": "calculate_ndvi"}
+                return {"kind": "action", "tool_name": "calculate_ndvi"}
             if operation in {"ndvi", "clarify_health", "clarify_scope"}:
                 if "plot_index_map" not in successes:
-                    return {"kind": "action", "tool": "plot_index_map"}
+                    return {"kind": "action", "tool_name": "plot_index_map", "artifact_refs": artifact_ref("index_raster")}
                 return {"kind": "handoff", "target": "Manager"}
             if operation == "greenspace":
                 if last.get("tool") == "apply_threshold" and not last.get("success") and phase != "recovery":
                     return {"kind": "revise", "next_action": "apply_threshold"}
                 if "apply_threshold" not in successes:
-                    return {"kind": "action", "tool": "apply_threshold"}
+                    return {"kind": "action", "tool_name": "apply_threshold", "artifact_refs": artifact_ref("index_raster"), "parameters": {"threshold_low": 0.3}}
                 if "plot_thematic_map" not in successes:
-                    return {"kind": "action", "tool": "plot_thematic_map"}
+                    return {"kind": "action", "tool_name": "plot_thematic_map", "artifact_refs": artifact_ref("mask_raster")}
                 if "calculate_area" not in successes:
-                    return {"kind": "action", "tool": "calculate_area"}
+                    return {"kind": "action", "tool_name": "calculate_area", "artifact_refs": artifact_ref("mask_raster")}
                 return {"kind": "handoff", "target": "Manager"}
             return {"kind": "stop", "reason": "No safe action is available for this request."}
 

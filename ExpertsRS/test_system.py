@@ -101,6 +101,69 @@ class UnifiedSystemTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 self._run("Map NDVI", root)
 
+    def test_model_visible_catalog_is_the_runtime_bound_safe_subset(self):
+        class InspectingProvider:
+            async def decide(self, role, state):
+                self.catalog = state["available_tools"]
+                return {"kind": "clarify", "question": "Need a precise output."}
+
+        provider = InspectingProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            self._run("What is the vegetation health condition?", Path(directory), system=ExpertsRSSystem(provider=provider))
+        self.assertEqual({item["tool_name"] for item in provider.catalog}, set(ExpertsRSSystem.TOOL_BINDINGS))
+        self.assertNotIn("calculate_evi", {item["tool_name"] for item in provider.catalog})
+
+    def test_invalid_model_json_is_traced_without_executing_a_tool(self):
+        class InvalidProvider:
+            async def decide(self, role, state):
+                return ["not", "a", "decision"]
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run("Map NDVI", Path(directory), system=ExpertsRSSystem(provider=InvalidProvider()))
+            trace = result.trace_path.read_text(encoding="utf-8")
+        self.assertEqual(result.status, RunStatus.FAILED)
+        self.assertEqual(result.validation.tool_calls, 0)
+        self.assertIn("invalid_model_decision", trace)
+
+    def test_unknown_tool_and_unsafe_action_contract_stop_without_execution(self):
+        class ActionProvider:
+            def __init__(self, action):
+                self.action = action
+
+            async def decide(self, role, state):
+                if role == "Manager":
+                    return {"kind": "handoff", "target": "Scientist"}
+                if role == "Scientist":
+                    return {"kind": "plan", "operation": "ndvi", "next_action": "read_raster_metadata"}
+                return self.action
+
+        actions = (
+            {"kind": "action", "tool_name": "calculate_evi"},
+            {"kind": "action", "tool_name": "read_raster_metadata", "parameters": {"file_path": "C:/secret.tif"}},
+            {"kind": "action", "tool_name": "plot_index_map"},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, action in enumerate(actions):
+                result = self._run("Map NDVI", Path(directory) / str(index), system=ExpertsRSSystem(provider=ActionProvider(action)))
+                self.assertIn(result.status, {RunStatus.FAILED, RunStatus.CONTROLLED_STOP})
+                self.assertEqual(result.validation.tool_calls, 0)
+
+    def test_action_requires_a_registered_artifact_id_not_a_type_or_path(self):
+        class WrongReferenceProvider:
+            async def decide(self, role, state):
+                if role == "Manager":
+                    return {"kind": "handoff", "target": "Scientist"}
+                if role == "Scientist":
+                    return {"kind": "plan", "operation": "ndvi", "next_action": "read_raster_metadata"}
+                if not state["observations"]:
+                    return {"kind": "action", "tool_name": "read_raster_metadata"}
+                return {"kind": "action", "tool_name": "plot_index_map", "artifact_refs": ["index_raster"]}
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run("Map NDVI", Path(directory), system=ExpertsRSSystem(provider=WrongReferenceProvider()))
+        self.assertEqual(result.status, RunStatus.CONTROLLED_STOP)
+        self.assertEqual(result.validation.tool_calls, 1)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

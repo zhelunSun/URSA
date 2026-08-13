@@ -84,9 +84,9 @@ class AutoGenAdapterTests(unittest.TestCase):
         responses = iter([
             '{"kind":"handoff","target":"Scientist"}',
             '{"kind":"plan","operation":"ndvi","next_action":"read_raster_metadata"}',
-            '{"kind":"action","tool":"read_raster_metadata"}',
-            '{"kind":"action","tool":"calculate_ndvi"}',
-            '{"kind":"action","tool":"plot_index_map"}',
+            '{"kind":"action","tool_name":"read_raster_metadata"}',
+            '{"kind":"action","tool_name":"calculate_ndvi"}',
+            '{"kind":"action","tool_name":"plot_index_map","artifact_refs":["team:action:02:index_raster"]}',
             '{"kind":"handoff","target":"Manager"}',
         ])
 

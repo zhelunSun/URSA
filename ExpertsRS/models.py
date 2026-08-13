@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -37,6 +37,100 @@ class RuntimeCapabilities(BaseModel):
 
     allow_plan_revision: bool = True
     allow_checkpoint_recovery: bool = True
+
+
+class ToolBinding(BaseModel):
+    """One model-visible tool contract backed by the local runtime.
+
+    ``safe_parameters`` are symbolic, allow-listed values.  The runtime alone
+    resolves data paths, output locations and artifact URIs.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    tool_name: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    required_artifact_types: tuple[str, ...] = ()
+    safe_parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class ManagerClarifyDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["clarify"]
+    question: str = Field(min_length=1, max_length=1_000)
+
+
+class ManagerHandoffDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["handoff"]
+    target: Literal["Scientist"]
+
+
+class ScientistPlanDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["plan"]
+    operation: Literal["ndvi", "greenspace", "lst"]
+    next_action: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+
+
+class ScientistStopDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["stop"]
+    reason: str = Field(min_length=1, max_length=1_000)
+
+
+class EngineerActionDecision(BaseModel):
+    """A symbolic request; no local location is accepted from a model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["action"]
+    tool_name: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    artifact_refs: list[str] = Field(default_factory=list)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("parameters")
+    @classmethod
+    def _parameters_must_not_contain_paths(cls, value: dict[str, Any]) -> dict[str, Any]:
+        def contains_path(candidate: Any) -> bool:
+            if isinstance(candidate, str):
+                return candidate.startswith(("/", "\\\\")) or ":\\" in candidate or ":/" in candidate
+            if isinstance(candidate, dict):
+                return any(contains_path(item) for item in candidate.values())
+            if isinstance(candidate, list):
+                return any(contains_path(item) for item in candidate)
+            return False
+
+        if contains_path(value):
+            raise ValueError("action parameters must be symbolic and must not contain paths")
+        return value
+
+
+class EngineerHandoffDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["handoff"]
+    target: Literal["Manager"]
+
+
+class EngineerStopDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["stop"]
+    reason: str = Field(min_length=1, max_length=1_000)
+
+
+class EngineerReviseDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["revise"]
+    next_action: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+
+
+class ReportDecision(BaseModel):
+    """Reserved report contract.  Rendering and report control remain WP3 work."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["report"]
+    summary: str = Field(min_length=1, max_length=10_000)
+    artifact_refs: list[str] = Field(default_factory=list)
 
 
 class RunRequest(BaseModel):

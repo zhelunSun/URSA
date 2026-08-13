@@ -10,16 +10,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .decisions import DecisionProvider, ScriptedDecisionProvider
+from .decisions import DecisionProvider, ScriptedDecisionProvider, parse_role_decision
 from .models import (
     ArtifactRecord,
     RunRequest,
     RunResult,
     RunStatus,
+    ToolBinding,
     ValidationSummary,
 )
 from .tools.output_context import use_output_directory
-from .tools.registry import get_tool_by_name, list_tools
+from .tools.registry import get_tool_by_name
 from .workflow import (
     ArtifactSpec,
     ArtifactType,
@@ -86,6 +87,20 @@ class ExpertsRSSystem:
         self.provider = provider or ScriptedDecisionProvider()
         self.executor = executor or LocalToolExecutor()
         self.allowed_data_roots = tuple(Path(path).resolve() for path in (allowed_data_roots or []))
+
+    # This deliberately exposes a safe subset of the registered legacy tool
+    # layer.  Each binding has runtime argument resolution and permission
+    # enforcement; registered tools without both remain model-invisible.
+    TOOL_BINDINGS: dict[str, ToolBinding] = {
+        "read_raster_metadata": ToolBinding(tool_name="read_raster_metadata"),
+        "calculate_ndvi": ToolBinding(tool_name="calculate_ndvi"),
+        "plot_index_map": ToolBinding(tool_name="plot_index_map", required_artifact_types=("index_raster",)),
+        "apply_threshold": ToolBinding(
+            tool_name="apply_threshold", required_artifact_types=("index_raster",), safe_parameters={"threshold_low": 0.3},
+        ),
+        "plot_thematic_map": ToolBinding(tool_name="plot_thematic_map", required_artifact_types=("mask_raster",)),
+        "calculate_area": ToolBinding(tool_name="calculate_area", required_artifact_types=("mask_raster",)),
+    }
 
     async def run(self, request: RunRequest) -> RunResult:
         run_id = request.run_id or f"run_{uuid.uuid4().hex[:12]}"
@@ -178,10 +193,10 @@ class ExpertsRSSystem:
                     continue
                 if kind != "action":
                     return self._stop(state, "Engineer produced an invalid decision.", actor="Runtime")
-                observation = self._execute_action(state, engineer.get("tool"))
+                observation = self._execute_action(state, engineer)
                 state["observations"].append(observation)
                 if not observation["success"]:
-                    if observation.get("error_code") == "permission_denied":
+                    if observation.get("error_code") in {"permission_denied", "tool_not_registered", "unsafe_action_contract", "missing_artifact", "budget_exhausted"}:
                         return self._stop(state, observation["message"], actor="Runtime")
                     if not state["capabilities"]["allow_plan_revision"]:
                         return self._stop(state, observation["message"], actor="Runtime")
@@ -199,11 +214,18 @@ class ExpertsRSSystem:
             "request": state["request"],
             "phase": state["phase"],
             "user_answers": state["user_answers"],
-            "available_tools": list_tools(),
+            "available_tools": [binding.model_dump(mode="json") for binding in self.TOOL_BINDINGS.values()],
             "observations": [self._redact_observation(item) for item in state["observations"]],
             "remaining_tool_budget": budgets["max_tool_calls"] - state["tool_calls"],
         }
-        decision = await self.provider.decide(role, view)
+        raw_decision = await self.provider.decide(role, view)
+        try:
+            decision = parse_role_decision(role, raw_decision)
+        except ValueError as error:
+            self._append_trace(
+                state, "invalid_model_decision", {"role": role, "reason": str(error)}, actor="Runtime"
+            )
+            raise RuntimeError(f"invalid_model_decision:{role}") from error
         await self._persist_provider_state(state)
         self._append_trace(state, "agent_decision", {"role": role, "decision": decision}, actor=role)
         return decision
@@ -244,12 +266,16 @@ class ExpertsRSSystem:
         self._trace(state).record_plan_version(plan)
         self._sync_trace(state)
 
-    def _execute_action(self, state: dict[str, Any], tool_name: str | None) -> dict[str, Any]:
-        if not tool_name or tool_name not in list_tools():
-            return {"tool": tool_name or "unknown", "success": False, "message": "Tool is not registered.", "error_code": "tool_not_registered"}
+    def _execute_action(self, state: dict[str, Any], decision: dict[str, Any]) -> dict[str, Any]:
+        tool_name = decision["tool_name"]
+        binding = self.TOOL_BINDINGS.get(tool_name)
+        if binding is None:
+            return {"tool": tool_name, "success": False, "message": "Tool is not in the runtime-visible catalog.", "error_code": "tool_not_registered"}
         if state["tool_calls"] >= state["budgets"]["max_tool_calls"]:
             return {"tool": tool_name, "success": False, "message": "tool_call_budget_exhausted", "error_code": "budget_exhausted"}
-        arguments = self._tool_arguments(state, tool_name)
+        arguments, contract_error = self._tool_arguments(state, binding, decision["artifact_refs"], decision["parameters"])
+        if contract_error:
+            return {"tool": tool_name, "success": False, "message": contract_error, "error_code": "unsafe_action_contract"}
         if arguments is None:
             return {"tool": tool_name, "success": False, "message": "Required artifact is unavailable.", "error_code": "missing_artifact"}
         action_id = f"{state['run_id']}:action:{state['tool_calls'] + 1:02d}"
@@ -286,22 +312,39 @@ class ExpertsRSSystem:
             self._sync_trace(state)
         return observation
 
-    def _tool_arguments(self, state: dict[str, Any], tool_name: str) -> dict[str, Any] | None:
+    def _tool_arguments(
+        self,
+        state: dict[str, Any],
+        binding: ToolBinding,
+        artifact_refs: list[str],
+        parameters: dict[str, Any],
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        tool_name = binding.tool_name
+        artifacts_by_id = {item["artifact_id"]: item for item in state["artifacts"]}
+        referenced_artifacts = [artifacts_by_id.get(artifact_id) for artifact_id in artifact_refs]
+        if (
+            len(artifact_refs) != len(binding.required_artifact_types)
+            or any(item is None for item in referenced_artifacts)
+            or [item["artifact_type"] for item in referenced_artifacts] != list(binding.required_artifact_types)
+        ):
+            return None, "Action artifact references do not match the approved tool binding."
+        if parameters != binding.safe_parameters:
+            return None, "Action parameters do not match the approved tool binding."
         source = state["data_paths"][0] if state["data_paths"] else None
-        by_type = {item["artifact_type"]: item["uri"] for item in state["artifacts"]}
+        by_type = {item["artifact_type"]: item["uri"] for item in referenced_artifacts if item is not None}
         if tool_name == "read_raster_metadata":
-            return {"file_path": source} if source else None
+            return ({"file_path": source} if source else None), None
         if tool_name == "calculate_ndvi":
-            return {"file_path": source, "nir_band": "B8", "red_band": "B4"} if source else None
+            return ({"file_path": source, "nir_band": "B8", "red_band": "B4"} if source else None), None
         if tool_name == "plot_index_map":
-            return {"file_path": by_type.get("index_raster"), "index_name": "NDVI"} if by_type.get("index_raster") else None
+            return ({"file_path": by_type.get("index_raster"), "index_name": "NDVI"} if by_type.get("index_raster") else None), None
         if tool_name == "apply_threshold":
-            return {"file_path": by_type.get("index_raster"), "threshold_low": 0.3, "output_name": "greenspace"} if by_type.get("index_raster") else None
+            return ({"file_path": by_type.get("index_raster"), "threshold_low": 0.3, "output_name": "greenspace"} if by_type.get("index_raster") else None), None
         if tool_name == "plot_thematic_map":
-            return {"file_path": by_type.get("mask_raster"), "output_name": "greenspace"} if by_type.get("mask_raster") else None
+            return ({"file_path": by_type.get("mask_raster"), "output_name": "greenspace"} if by_type.get("mask_raster") else None), None
         if tool_name == "calculate_area":
-            return {"file_path": by_type.get("mask_raster"), "class_values": [1]} if by_type.get("mask_raster") else None
-        return None
+            return ({"file_path": by_type.get("mask_raster"), "class_values": [1]} if by_type.get("mask_raster") else None), None
+        return None, "No runtime argument resolver exists for this tool."
 
     @staticmethod
     def _effect(tool_name: str) -> ToolEffect:
@@ -389,7 +432,7 @@ class ExpertsRSSystem:
 
     @staticmethod
     def _redact_observation(observation: dict[str, Any]) -> dict[str, Any]:
-        return {key: value for key, value in observation.items() if key in {"tool", "success", "message", "error_code", "artifact_id"}}
+        return {key: value for key, value in observation.items() if key in {"tool", "success", "message", "error_code", "artifact_id", "artifact_type"}}
 
     @staticmethod
     def _redact_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
