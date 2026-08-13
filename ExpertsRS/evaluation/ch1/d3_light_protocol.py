@@ -86,7 +86,7 @@ def build_run_manifest(panel: dict[str, Any], slot: D3CaseSlot) -> dict[str, Any
     agent_case = build_agent_case(panel, slot.source_task_id, slot.condition_id)
     evaluator_case = build_evaluator_case(panel, slot.source_task_id, slot.condition_id)
     try:
-        autogen_version = importlib.metadata.version("pyautogen")
+        autogen_version = importlib.metadata.version("autogen-agentchat")
     except importlib.metadata.PackageNotFoundError:
         autogen_version = "not_installed"
     return {

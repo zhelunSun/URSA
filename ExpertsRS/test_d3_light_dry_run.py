@@ -1,5 +1,6 @@
 """No-API tests for the shared D3-light runner and frozen protocol."""
 
+import asyncio
 import json
 import tempfile
 import unittest
@@ -13,8 +14,9 @@ from evaluation.ch1.d3_light_protocol import (
     build_case_slots,
     write_dry_run_manifests,
 )
-from evaluation.ch1.d3_light_runner import D3LightRunner, DeterministicDryRunProvider
-from evaluation.ch1.run_d3_light_dry_run import run_all_dry_cases
+from evaluation.ch1.d3_light_runner import D3LightRunner, DeterministicDryRunProvider, run_unified_d3_case
+from evaluation.ch1.d3_light_tool_executor import D3LightToolExecutor
+from evaluation.ch1.run_d3_light_dry_run import run_all_dry_cases, run_all_unified_dry_cases
 
 
 class D3LightDryRunTests(unittest.TestCase):
@@ -78,6 +80,45 @@ class D3LightDryRunTests(unittest.TestCase):
             sum(payload["terminal_status"] == "completed" for payload in payloads),
             5,
         )
+
+    def test_real_local_tools_close_checkpoint_recovery_without_an_api(self):
+        runner = D3LightRunner(self.panel, DeterministicDryRunProvider(), D3LightToolExecutor())
+        slot = next(
+            slot for slot in build_case_slots(self.panel)
+            if slot.source_task_id == 11 and slot.condition_id == "B3_checkpoint"
+        )
+        result = runner.run(slot)
+        artifacts = [
+            event["payload"] for event in result.trace.events
+            if event["event_type"] == "artifact_recorded"
+        ]
+        self.assertTrue(result.evaluation["passed"])
+        self.assertTrue(result.evaluation["recovery_locality"])
+        self.assertTrue(any(
+            item.get("artifact_type") == "index_raster" and item["uri"].endswith(".tif")
+            for item in artifacts
+        ))
+
+    def test_unified_runtime_maps_d3_conditions_to_capability_policy_only(self):
+        slots = {slot.condition_id: slot for slot in build_case_slots(self.panel) if slot.source_task_id == 11}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            static = asyncio.run(run_unified_d3_case(slots["B1_static"], destination=root / "b1"))
+            adaptive = asyncio.run(run_unified_d3_case(slots["B2_adaptive"], destination=root / "b2"))
+            checkpoint = asyncio.run(run_unified_d3_case(slots["B3_checkpoint"], destination=root / "b3"))
+        self.assertEqual(static.status.value, "controlled_stop")
+        self.assertEqual(adaptive.status.value, "completed")
+        self.assertEqual(checkpoint.status.value, "completed")
+        self.assertIsNone(adaptive.checkpoint_id)
+        self.assertIsNotNone(checkpoint.checkpoint_id)
+
+    def test_all_fifteen_unified_runtime_cases_pass_external_evaluation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            paths = run_all_unified_dry_cases(Path(directory))
+            payloads = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+        self.assertEqual(len(paths), 15)
+        self.assertTrue(all(payload["mode"] == "unified_runtime_scripted_offline" for payload in payloads))
+        self.assertTrue(all(payload["evaluation"]["passed"] for payload in payloads))
 
 
 if __name__ == "__main__":

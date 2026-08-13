@@ -138,20 +138,46 @@ case matrix, one seeded operational failure, terminal states, artifact checks,
 plan-revision/checkpoint expectations, graph construction, and evaluator
 separation fit together. It does **not** substitute for a real-model run.
 
-The proposed live configuration is deliberately conservative: one existing
+The proposed model configuration is deliberately conservative: one existing
 tool-capable model family (`DEEPSEEK_MODEL`, default
-`deepseek-ai/DeepSeek-V3`), temperature `0`, no response cache, 30 group-chat
-rounds, 12 model turns, 10 total tool calls, 300 seconds, 6,000 completion
-tokens and 18,000 recorded tokens per run. Model and tool retries are zero:
-network/API failures become recorded terminal outcomes rather than hidden
-replacement runs. The exact values, hashes, versions, usage metadata and wall
-time are emitted in each planned run manifest.
+`deepseek-ai/DeepSeek-V3`), temperature `0`, no response cache, 12 model turns,
+10 total tool calls, 300 seconds, 6,000 completion tokens and 18,000 recorded
+tokens per run. Model and tool retries are zero: network/API failures become
+recorded terminal outcomes rather than hidden replacement runs. These values
+are currently a **candidate**, not an executable live protocol: provider,
+prompt hash and role-specific budget enforcement must be frozen first.
 
-The future live provider remains intentionally unimplemented. It must implement
-the runner's small decision interface while preserving the existing
-Manager–Scientist–Engineer–Executor routing; it may not expose fixtures or
-scoring contracts to the agents. Live calls require two separate approvals:
-the frozen JSON gate and a local environment flag. Both are currently closed.
+The historical hand-written model-call adapter is retained only for
+API-boundary tests and is **not** an AutoGen scheduler. The current offline
+evaluation gate invokes the authoritative `ExpertsRSSystem` for all 15 slots;
+B1/B2/B3 vary only runtime capability policy, while the external evaluator
+reads the trace and artifacts. The production model-facing bridge is
+`AutoGenSelectorDecisionProvider`, whose Team executes each named role decision
+and whose state is persisted by the runtime. The live path remains blocked
+until provider, disclosure boundary, hashes and budgets are reviewed and the
+API gate is explicitly opened.
+
+On 2026-08-12, the same 15 slots completed a **local-tool pre-flight** with
+the deterministic decision substitute and the real registered tools. It
+verified semantic B8/B4 NDVI resolution, artifact creation, a one-time
+operational threshold-write failure, adaptive revision, and checkpoint reuse.
+This is engineering/diagnostic evidence only: it neither calls a model nor
+measures model planning quality.
+
+### What requires the researcher's API approval
+
+Only four things: the exact provider/model, the 15-run spending cap and per-run
+limits, the limited text sent to that provider, and opening both gates. The
+provider may receive the original user request, role instructions, registered
+tool names, and a short redacted tool observation. It must never receive raster
+pixels/files, local paths, hashes, keys, hidden failure markers, expected
+outcomes, external scores, gold labels, full machine context, or private chain
+of-thought. The provider key belongs only in untracked `ExpertsRS/.env`; do not
+paste it into chat or a document.
+
+No permission is needed for the local code preparation already completed. Do
+not authorize 45 runs yet: run the 15-case smoke first, inspect cost and failure
+patterns, then separately decide whether repetition is worthwhile.
 
 ## Relationship to the historical Table 2
 

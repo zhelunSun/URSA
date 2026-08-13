@@ -194,6 +194,15 @@ dry run，以及固定但尚未获 API 授权的模型/采样/预算协议。dry
 授权，应只实现一个保留 Manager–Scientist–Engineer–Executor 路由的 live provider，先跑 15 次
 smoke，不扩大任务或提前做 45-run 重复。
 
+同日进一步完成模型调用接口和本地真实工具执行器的无网络准备。前者只向指定 provider 传递
+原始请求、公开角色指令、注册工具名与脱敏观察，严格解析一条下一步 JSON；后者只调用已注册
+工具，并仅在任务 11 触发一次批准的局部故障。模型、Executor 与 evaluator 的职责没有合并。
+API key 不进入代码、运行记录或 Git；API 双门禁在请求发出前检查，模型更换也会拒绝。此处的
+“模型调用接口”是工程接线，不是新的论文模块或验证器。随后，同一 runner 以确定性决策替身和
+真实注册工具完成 15 槽本地预飞行：B8/B4 语义解析、产物记录、一次阈值写入故障、B2 修订与 B3
+检查点复用均可重建；这仍只是 engineering/diagnostic evidence，既不调用模型，也不衡量模型规划。
+真实 15-run 尚未授权、尚未执行。
+
 ## 下一次允许升级状态的条件
 
 1. 将当前未跟踪的 workflow/ReAct/tests/docs 与环境信息纳入可重建 baseline；

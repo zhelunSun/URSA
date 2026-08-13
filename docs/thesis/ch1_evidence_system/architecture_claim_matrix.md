@@ -17,7 +17,7 @@
 | targeted repair | 单一 missing output 且唯一 candidate 时补一个 node | engineering + diagnostic | 不是 observation-driven replanning；candidate uniqueness 依赖粗类型 | 已实现 deterministic repair baseline，不升级为一般恢复能力 |
 | controlled stop | blocking/ambiguous/unsupported 时停止并记录 | engineering + diagnostic | 没有 ask-user/replan 的 live integration | 对不支持情形显式停止，不隐藏改写 |
 | `WorkflowTrace` | 旧事件 payload + 稳定事件编号、顺序、责任者、对象和类型化引用 | engineering + diagnostic | 缺 schema/model/tool/data version 与 replay runner | 已形成兼容旧路径的统一运行事实外壳 |
-| ReAct routing | selector/executor 分离、observation return、预算 | engineering | ReAct 是通用模式；未和 typed validator 串成 live path | 改善原型交互语义与可观测性 |
+| ReAct routing | AG2/AutoGen GroupChat + 项目 selector/executor 分离、observation return、预算 | engineering | ReAct 是通用模式；尚未与 typed runtime 串成 live path | 改善原型交互语义与可观测性；不是独立创新 |
 | 分层检查责任 | Manager 用户确认、Scientist/Engineer 责任、固定规则检查、独立评测已有部分资产 | design-frozen support | 尚无执行前/后/结束时的统一编排；无按需审核器约定 | 检查责任已分层定义；不声称已实现常驻审核 Agent 或验证一切结果 |
 | 权限检查接口 | 18-tool effect 表、本地默认拒绝 policy、允许/拒绝记录；唯一 Executor 仍是执行入口 | implemented-interface | 尚未把 policy 强制接入所有 live ReAct 调用；无确认流、企业身份与隔离 | 已实现第一章最小接口，不称完整权限系统或创新点 |
 | 可修改的计划 | 不可变计划版本记录总体目标、阶段、下一动作、父版本、触发反馈与恢复检查点 | implemented-no-api | 由 fixture 构造，尚未由真实 Scientist 稳定生成/修改 | 已实现最小表示和单一故障修订，不称规划效果提升 |
@@ -25,6 +25,7 @@
 | 基于检查点的局部恢复 | 逻辑检查点引用恢复位置和有效产出；故障 fixture 保留失败路径并复用元数据 | implemented-fixture-narrow | 单一注入故障；不可逆动作不能撤销，无通用分支搜索 | 已实现最小局部恢复，不称自我学习 |
 | broad runtime branch | state/checkpoint/artifact/evaluator/provenance | engineering exploration | side branch、deterministic nodes、未并入 current method | 作为设计探索和候选资产，不作为当前完成度 |
 | P0--P3 | 文档设计 | design only | 尚无 matched tasks/runs/statistics/error analysis | 只能说“已设计”，不能说“有效” |
+| D3 direct 模型调用适配器 | 手写 OpenAI-compatible REST + 单步 JSON 解析 | engineering preparation | 不是 AutoGen/AG2 调度，runner 仍以 task/phase 推进；不得作为 live multi-agent D3 执行器 | 只可称模型调用与脱敏边界准备；真实 D3 需 AG2–runtime bridge |
 
 ## D1 资产映射（2026-08-10）
 

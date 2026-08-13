@@ -41,11 +41,13 @@ assets and are deliberately not imported by the new package.
   overwrite prior outputs.
 - **P0 resolved:** local read/write authorization is evaluated before execution.
 - **P1 resolved:** plan/recovery/trace state is one runtime-owned source of truth.
-- **P1 remaining:** a configured modern AutoGen model client must be exercised
-  behind `AutoGenSelectorDecisionProvider` before any live D3 authorization.
-- **P2 remaining:** D3 evaluator migration should call `ExpertsRSSystem` for
-  B1/B2/B3 after the model-adapter protocol is frozen; the former D3 runner is
-  still a no-API historical preflight fixture.
+- **P1 resolved offline:** the modern `SelectorGroupChat` executes each named
+  role decision and its portable Team state is persisted alongside runtime
+  state. A configured real model client still requires a separate live smoke
+  before any live D3 authorization.
+- **P2 resolved offline:** the 15 D3 evaluator slots call `ExpertsRSSystem`
+  for B1/B2/B3, differing only in runtime capability policy. The former D3
+  runner remains a no-API historical preflight fixture.
 - **P3 deferred by scope:** web API, multi-tenancy, distributed workers,
   enterprise IAM and automated data-download workflows.
 

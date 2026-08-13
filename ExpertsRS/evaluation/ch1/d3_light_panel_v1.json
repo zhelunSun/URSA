@@ -241,6 +241,26 @@
       "human_input_policy": "No human answer is supplied during a run. A Manager clarification request is the terminal state for task 13.",
       "failure_policy": "On budget, timeout, API, tool, or protocol failure, emit a structured terminal state and preserve the partial trace. Do not silently retry or replace a run."
     },
+    "external_data_boundary": {
+      "may_send_to_model_provider": [
+        "original natural-language request and supplied text context",
+        "public role instruction text",
+        "registered tool names",
+        "redacted phase, tool-result success/failure, short error message, and artifact type"
+      ],
+      "must_not_send_to_model_provider": [
+        "raster pixels or raster file",
+        "local absolute paths, file hashes, API keys, environment values, or user filesystem contents",
+        "hidden fixture markers, expected terminal states, scoring contracts, evaluator outputs, or gold labels",
+        "unbounded chat history or chain-of-thought"
+      ]
+    },
+    "authorization_required": [
+      "Approve the exact provider/model and external text disclosure boundary.",
+      "Approve the 15-run smoke cap and the per-run token/time/tool budgets.",
+      "Set run_gate.api_calls_authorized=true in a reviewed commit and set EXPERTSRS_D3_LIGHT_ALLOW_API=YES locally.",
+      "Place the provider key only in untracked ExpertsRS/.env; never paste it into chat, source, traces, or Git."
+    ],
     "provenance_required": [
       "git_commit",
       "panel_sha256",

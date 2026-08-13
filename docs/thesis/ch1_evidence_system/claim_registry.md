@@ -19,7 +19,7 @@
 | `C1-CTRL-01` | design-frozen-support | 检查由角色责任、运行时固定规则、按需且无执行权限的临时审核器与系统外独立评测分层承担，不默认增加常驻审核 Agent。 | scope gate、module map、validation ladder、D1 asset map | 执行前/后/结束时的检查尚未统一；临时审核触发条件未实现 | D2 检查记录 + 标准答案不泄露测试；若比较审核器，单列对照 |
 | `C1-CTRL-02` | implemented-interface | 角色分工不等于权限；Agent 提出动作，运行时以版本化规则记录允许或拒绝，唯一 Executor 才真实执行。 | selector/executor split、18-tool effect table、`LocalPermissionPolicy`、D2 deny fixture | 当前 policy 只覆盖本地路径与 18 工具；无企业身份、确认流程或隔离 | D3 验证 Executor 接口调用；生产权限延后 |
 | `C1-BOUNDARY-01` | accepted-framing | 第一章保证工作流安全、完整、可追溯地运行并承担检查点恢复；第二章判断方法与结论为何需要修改并输出有依据的行动义务；第三章在系统外独立评价结果、过程和用户效用。 | module continuity map、validation ladder、thesis state、researcher clarification 2026-08-11 | 通用工具底线与任务特定科学判断仍需在实现和实验中按此边界审计 | D2 只实现运行边界；第二章约束复用第一章恢复接口；第三章保持标准答案隔离 |
-| `C1-EFF-01` | pending-dry-run-ready | 不得使用“adaptive trace-native execution 提高了真实 LLM 任务可靠性”。 | D3-light 5-task panel、B1/B2/B3 contracts、leakage-safe loader、15-slot deterministic dry run | 没有 live provider/static-vs-adaptive live run；API 双门禁关闭 | 实现保持既有角色路由的 live provider，固定模型/工具/预算完成 15-run smoke；稳定后决定是否做 3 次重复与 error analysis |
+| `C1-EFF-01` | live-execution-blocked | 不得使用“adaptive trace-native execution 提高了真实 LLM 任务可靠性”。 | D3-light 5-task panel、B1/B2/B3 contracts、leakage-safe loader、15-slot deterministic dry run、local-tool preflight | 当前 direct 模型调用适配器不是 AG2 多 Agent 调度；static/adaptive live run 尚未存在，API 双门禁关闭 | 先让既有 AG2 角色路由与运行时记录通过小型 bridge 合流，再固定共同强制的模型/工具/预算并完成 15-run smoke；稳定后决定是否做 3 次重复与 error analysis |
 | `C1-EFF-02` | prohibited | 不得使用“多智能体普遍优于单智能体”。 | 无当前新证据 | agent count 与 method factor 混杂 | 独立 matched factor study，若确有必要 |
 
 ## 引用格式示例

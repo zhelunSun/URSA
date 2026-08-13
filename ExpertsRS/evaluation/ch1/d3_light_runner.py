@@ -1,8 +1,10 @@
-"""One condition-aware D3-light runner with a deterministic no-API provider.
+"""One condition-aware D3-light local mechanism runner.
 
-The fake provider exists only to exercise the runner, evaluator separation, and
-all 15 condition/task slots.  A future live provider must implement the same
-``next_step`` interface and may be added only after the API gate is approved.
+The deterministic substitute exists only to exercise the runner, evaluator
+separation, and all 15 condition/task slots. Its task/phase transitions are
+purposefully constrained and do not implement real multi-agent scheduling. A
+future live experiment must bridge the existing AG2/AutoGen routing rather than
+replace it with this runner's ``next_step`` interface.
 """
 
 from __future__ import annotations
@@ -11,26 +13,42 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from workflow import (
-    Checkpoint,
-    LocalPermissionPolicy,
-    PermissionOutcome,
-    PermissionRequest,
-    PlanVersion,
-    TOOL_EFFECTS,
-    ToolEffect,
-    WorkflowTrace,
-    build_process_graph,
-)
+try:  # Source-tree compatibility for historical tests.
+    from ...workflow import (
+        Checkpoint, LocalPermissionPolicy, PermissionOutcome, PermissionRequest,
+        PlanVersion, TOOL_EFFECTS, ToolEffect, WorkflowTrace, build_process_graph,
+    )
+except ImportError:  # pragma: no cover - legacy invocation from ExpertsRS/.
+    from workflow import (
+        Checkpoint, LocalPermissionPolicy, PermissionOutcome, PermissionRequest,
+        PlanVersion, TOOL_EFFECTS, ToolEffect, WorkflowTrace, build_process_graph,
+    )
+
+# The legacy D3 runner below is retained only to reproduce previously frozen
+# no-API manifests.  New evaluator integrations call the authoritative system
+# entry point through ``run_unified_d3_case`` at the end of this module.
 
 from .d3_light_loader import build_agent_case, build_evaluator_case, load_panel
 from .d3_light_protocol import D3CaseSlot
 
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
 class DecisionProvider(Protocol):
-    """The deliberately narrow interface shared by fake and future live models."""
+    """Narrow local test interface; deliberately not an Agent framework interface."""
 
     def next_step(self, agent_case: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]: ...
+
+
+class ToolExecutor(Protocol):
+    """Local execution boundary used by the same runner in a real-tool check."""
+
+    def begin_case(self) -> None: ...
+
+    def execute(
+        self, tool_name: str, artifacts: dict[str, str], *, inject_transient_failure: bool = False
+    ) -> dict[str, Any]: ...
 
 
 class DeterministicDryRunProvider:
@@ -80,9 +98,15 @@ class DryRunResult:
 class D3LightRunner:
     """Runs B1/B2/B3 through a shared execution skeleton and evaluator view."""
 
-    def __init__(self, panel: dict[str, Any], provider: DecisionProvider) -> None:
+    def __init__(
+        self,
+        panel: dict[str, Any],
+        provider: DecisionProvider,
+        tool_executor: ToolExecutor | None = None,
+    ) -> None:
         self.panel = panel
         self.provider = provider
+        self.tool_executor = tool_executor
         root = Path(__file__).resolve().parents[2]
         self.data_root = root / "data"
         self.results_root = root / "results"
@@ -93,23 +117,59 @@ class D3LightRunner:
         evaluator_case = build_evaluator_case(self.panel, slot.source_task_id, slot.condition_id)
         condition = evaluator_case["condition"]
         trace = WorkflowTrace(f"dry_{slot.case_id}")
-        state: dict[str, Any] = {"phase": "metadata", "actions": 0, "failure_injected": False}
+        state: dict[str, Any] = {
+            "phase": "metadata",
+            "actions": 0,
+            "failure_injected": False,
+            "artifacts": {},
+            "available_tools": self._available_tools(slot.source_task_id),
+            "remaining_tool_budget": 10,
+            "last_observation": {},
+        }
+        if self.tool_executor is not None:
+            self.tool_executor.begin_case()
         plan_id = self._record_initial_plan(trace, agent_case, condition)
 
         if slot.source_task_id == 3:
-            terminal = self._record_stop(trace, "controlled_stop", "registered NDSI operator unavailable")
+            if self._model_budget_exhausted(state):
+                terminal = self._record_stop(trace, "budget_exhausted", "model-turn budget exhausted")
+                return self._finish(trace, evaluator_case, slot, terminal, condition)
+            decision = self.provider.next_step(agent_case, state)
+            self._record_decision(trace, decision, state)
+            if decision.get("kind") != "stop":
+                terminal = self._record_stop(trace, "protocol_violation", "missing operator task requires an explicit stop")
+            else:
+                terminal = self._record_stop(trace, decision["status"], decision["reason"])
         elif slot.source_task_id == 13:
-            trace.record(
-                "manager_clarification_requested",
-                {"question": self.provider.next_step(agent_case, {"phase": "clarify"})["question"]},
-                actor="Manager",
-                object_id="clarification-request",
-                references=(),
-            )
-            terminal = self._record_stop(trace, "needs_user_clarification", "unresolved user definition")
+            if self._model_budget_exhausted(state):
+                terminal = self._record_stop(trace, "budget_exhausted", "model-turn budget exhausted")
+                return self._finish(trace, evaluator_case, slot, terminal, condition)
+            decision = self.provider.next_step(agent_case, {**state, "phase": "clarify"})
+            self._record_decision(trace, decision, {**state, "phase": "clarify"})
+            if decision.get("kind") != "clarify":
+                terminal = self._record_stop(trace, "protocol_violation", "unresolved user definition requires clarification")
+            else:
+                trace.record(
+                    "manager_clarification_requested",
+                    {"question": decision["question"]},
+                    actor="Manager",
+                    object_id="clarification-request",
+                    references=(),
+                )
+                terminal = self._record_stop(trace, "needs_user_clarification", "unresolved user definition")
         else:
             terminal = self._run_tool_path(trace, agent_case, evaluator_case, plan_id, state)
 
+        return self._finish(trace, evaluator_case, slot, terminal, condition)
+
+    @staticmethod
+    def _finish(
+        trace: WorkflowTrace,
+        evaluator_case: dict[str, Any],
+        slot: D3CaseSlot,
+        terminal: str,
+        condition: dict[str, Any],
+    ) -> DryRunResult:
         graph = None
         if condition["process_graph_from_run_facts"]:
             graph = build_process_graph(trace.run_id, trace.events).to_dict()
@@ -145,22 +205,29 @@ class D3LightRunner:
         task_id = agent_case["source_task_id"]
         condition = evaluator_case["condition"]
         artifact_ids: list[str] = []
-        while state["actions"] < 8:
+        while state["actions"] < self.panel["proposed_run_protocol"]["per_run_budget"]["max_tool_calls"]:
+            if self._model_budget_exhausted(state):
+                return self._record_stop(trace, "budget_exhausted", "model-turn budget exhausted")
             decision = self.provider.next_step(agent_case, state)
+            self._record_decision(trace, decision, state)
+            state["model_turns"] = state.get("model_turns", 0) + 1
             if decision["kind"] == "stop":
                 return self._record_stop(trace, decision["status"], decision["reason"])
             tool_name = decision["tool"]
-            action_id, observation_id, success = self._record_mock_action(
+            if tool_name not in state["available_tools"]:
+                return self._record_stop(trace, "protocol_violation", f"unavailable tool proposed: {tool_name}")
+            action_id, observation_id, success = self._record_tool_action(
                 trace, plan_id, tool_name, state, task_id, evaluator_case["fixture"], condition
             )
             state["actions"] += 1
+            state["remaining_tool_budget"] -= 1
             if not success:
                 if not condition["plan_revision_after_tool_observation"]:
                     return self._record_stop(trace, "controlled_stop", "tool observation failed in static condition")
                 plan_id = self._record_revised_plan(trace, plan_id, observation_id, condition, artifact_ids)
                 state["phase"] = "threshold_retry"
                 continue
-            artifact_id = self._artifact_for_tool(trace, action_id, tool_name, condition, task_id)
+            artifact_id = self._artifact_for_tool(trace, action_id, tool_name, state)
             if artifact_id:
                 artifact_ids.append(artifact_id)
             if task_id == 10 and state["phase"] == "metadata":
@@ -188,7 +255,29 @@ class D3LightRunner:
                     return self._record_stop(trace, "completed", "all requested artifacts recorded")
         return self._record_stop(trace, "budget_exhausted", "dry-run action budget exhausted")
 
-    def _record_mock_action(
+    def _model_budget_exhausted(self, state: dict[str, Any]) -> bool:
+        return state.get("model_turns", 0) >= self.panel["proposed_run_protocol"]["per_run_budget"]["max_model_turns"]
+
+    @staticmethod
+    def _record_decision(
+        trace: WorkflowTrace, decision: dict[str, Any], state: dict[str, Any]
+    ) -> None:
+        """Record the decision boundary, never the model's hidden reasoning text."""
+        payload = {key: decision[key] for key in ("kind", "tool", "status", "reason", "question", "plan_update") if key in decision}
+        if isinstance(decision.get("usage"), dict):
+            payload["usage"] = {
+                key: value for key, value in decision["usage"].items()
+                if key in {"prompt_tokens", "completion_tokens", "total_tokens"}
+                and isinstance(value, (int, float))
+            }
+        if isinstance(decision.get("provider_model"), str):
+            payload["provider_model"] = decision["provider_model"]
+        actor = "Manager" if decision.get("kind") == "clarify" else (
+            "Scientist" if state["phase"] in {"metadata", "thermal_check"} else "Engineer"
+        )
+        trace.record("role_decision_recorded", payload, actor=actor, object_id=f"decision-{state['actions'] + 1}")
+
+    def _record_tool_action(
         self,
         trace: WorkflowTrace,
         plan_id: str,
@@ -207,9 +296,22 @@ class D3LightRunner:
         if permission.outcome != PermissionOutcome.ALLOW:
             raise RuntimeError(f"Dry-run permission unexpectedly denied: {permission.reason}")
         action_id = f"action-{state['actions'] + 1}-{tool_name}"
-        trace.record_action(
-            action_id, "Engineer", tool_name, {"fixture": "dry-run"}, plan_id, permission.decision_id
-        )
+        arguments = {"fixture": "dry-run"} if self.tool_executor is None else {"mode": "registered_local_tool"}
+        trace.record_action(action_id, "Engineer", tool_name, arguments, plan_id, permission.decision_id)
+        if self.tool_executor is not None:
+            result = self.tool_executor.execute(
+                tool_name,
+                state["artifacts"],
+                inject_transient_failure=(
+                    fixture["kind"] == "seeded_transient_tool_failure"
+                ),
+            )
+            success = bool(result.get("success"))
+            observation_payload = self._compact_tool_result(tool_name, result)
+            state["last_observation"] = observation_payload
+            observation_id = f"observation-{state['actions'] + 1}-{tool_name}"
+            trace.record_observation(observation_id, "Executor", action_id, success, observation_payload)
+            return action_id, observation_id, success
         inject = (
             fixture["kind"] == "seeded_transient_tool_failure"
             and tool_name == "apply_threshold"
@@ -222,13 +324,46 @@ class D3LightRunner:
         else:
             observation_payload = {"message": f"deterministic dry-run {tool_name} success"}
             success = True
+        state["last_observation"] = observation_payload
         observation_id = f"observation-{state['actions'] + 1}-{tool_name}"
         trace.record_observation(observation_id, "Executor", action_id, success, observation_payload)
         return action_id, observation_id, success
 
     @staticmethod
+    def _compact_tool_result(tool_name: str, result: dict[str, Any]) -> dict[str, Any]:
+        """Keep a useful local trace without embedding full tool data or paths in an observation."""
+        data = result.get("data")
+        payload: dict[str, Any] = {
+            "tool_name": tool_name,
+            "message": str(result.get("message", "")),
+        }
+        if not result.get("success"):
+            payload["error_code"] = str(result.get("error_code", "tool_failed"))
+        if isinstance(data, dict):
+            for key in ("output_path", "file_name", "shape", "valid_pixels", "total_pixels", "nodata_pixels"):
+                if key in data:
+                    payload[key] = data[key]
+        return payload
+
+    @staticmethod
+    def _available_tools(task_id: int) -> list[str]:
+        return {
+            2: ["read_raster_metadata", "calculate_ndvi", "plot_index_map"],
+            3: [],
+            10: ["read_raster_metadata"],
+            11: [
+                "read_raster_metadata",
+                "calculate_ndvi",
+                "apply_threshold",
+                "plot_thematic_map",
+                "calculate_area",
+            ],
+            13: [],
+        }[task_id]
+
+    @staticmethod
     def _artifact_for_tool(
-        trace: WorkflowTrace, action_id: str, tool_name: str, condition: dict[str, Any], task_id: int
+        trace: WorkflowTrace, action_id: str, tool_name: str, state: dict[str, Any]
     ) -> str | None:
         artifact_type = {
             "read_raster_metadata": "metadata",
@@ -241,11 +376,14 @@ class D3LightRunner:
         if artifact_type is None:
             return None
         artifact_id = f"artifact-{artifact_type}-{action_id}"
+        output_path = state.get("last_observation", {}).get("output_path")
+        uri = str(output_path) if output_path else f"memory://{artifact_id}"
+        state["artifacts"][artifact_type] = uri
         trace.record_artifact(
             artifact_id,
             "Executor",
             action_id,
-            f"memory://{artifact_id}",
+            uri,
             True,
             artifact_type=artifact_type,
         )
@@ -350,5 +488,112 @@ def evaluate_dry_run(
         "graph_present": graph is not None,
         "ndvi_action_count": ndvi_action_count,
         "recovery_locality": recovery_locality,
+        "task_specific_evidence": task_specific_evidence,
+    }
+
+
+async def run_unified_d3_case(
+    slot: D3CaseSlot,
+    *,
+    destination: str | Path,
+    system: Any | None = None,
+) -> Any:
+    """Run one D3 case through the authoritative ExpertsRS API.
+
+    The evaluator converts B1/B2/B3 only into capability policy.  It never
+    supplies an action sequence, a role phase, hidden gold, or fixture content
+    to the decision provider.  A caller may inject a local Executor failure for
+    the reviewed task-11 fixture.
+    """
+    try:
+        from ExpertsRS import ExpertsRSSystem, LocalToolExecutor, RunRequest, RuntimeCapabilities
+    except ModuleNotFoundError:  # Legacy test invocation executes from ExpertsRS/.
+        import sys
+        sys.path.insert(0, str(ROOT.parent))
+        from ExpertsRS import ExpertsRSSystem, LocalToolExecutor, RunRequest, RuntimeCapabilities
+
+    panel = load_panel()
+    agent_case = build_agent_case(panel, slot.source_task_id, slot.condition_id)
+    condition = panel["conditions"][slot.condition_id]
+    if system is None:
+        failures = {"apply_threshold": 1} if slot.source_task_id == 11 else {}
+        fixture_ids = {"apply_threshold": "d3-task-11-threshold-once"} if failures else {}
+        system = ExpertsRSSystem(executor=LocalToolExecutor(
+            inject_failures=failures, injected_failure_ids=fixture_ids,
+        ))
+    capabilities = RuntimeCapabilities(
+        allow_plan_revision=bool(condition["plan_revision_after_tool_observation"]),
+        allow_checkpoint_recovery=bool(condition["checkpoint_recovery"]),
+    )
+    source = Path(panel["fixed_context"]["raster"])
+    if not source.is_absolute():
+        source = ROOT / "data" / source.name
+    return await system.run(RunRequest(
+        request=agent_case["request"], data_paths=[source], output_dir=Path(destination),
+        run_id=slot.case_id.replace("__", "_"), capabilities=capabilities,
+    ))
+
+
+def evaluate_unified_d3_run(result: Any, evaluator_case: dict[str, Any]) -> dict[str, Any]:
+    """Grade a unified-runtime trace without entering its hidden contract into Agent context."""
+    import json
+
+    trace_path = Path(result.trace_path)
+    events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines() if line]
+    terminal_status = result.status.value
+    condition_id = evaluator_case["condition_id"]
+    contract = evaluator_case["chapter1_contract"]
+    event_types = [event["event_type"] for event in events]
+    actions = [
+        event["payload"].get("tool_name") for event in events
+        if event["event_type"] == "action_started"
+    ]
+    observed_artifacts = {
+        event["payload"].get("artifact_type") for event in events
+        if event["event_type"] == "artifact_recorded"
+    }
+    terminal_events = [event["payload"] for event in events if event["event_type"] == "run_terminal"]
+    task_id = evaluator_case["source_task_id"]
+    revision_required = task_id == 11 and condition_id in {"B2_adaptive", "B3_checkpoint"}
+    checkpoint_required = task_id == 11 and condition_id == "B3_checkpoint"
+    required_artifacts = set(contract.get("required_artifact_types", contract.get("required_artifact_types_on_completion", [])))
+    ndvi_action_count = actions.count("calculate_ndvi")
+    task_specific_evidence = {
+        2: {"read_raster_metadata", "calculate_ndvi", "plot_index_map"}.issubset(actions),
+        3: not actions and bool(terminal_events) and "NDSI" in terminal_events[-1].get("reason", ""),
+        10: "read_raster_metadata" in actions and bool(terminal_events) and "thermal" in terminal_events[-1].get("reason", "").lower(),
+        11: "evaluation_fixture_injected" in event_types,
+        13: "manager_clarification_requested" in event_types and not actions,
+    }[task_id]
+    revision_present = sum(event_type == "plan_version_recorded" for event_type in event_types) >= 2
+    checkpoint_present = "checkpoint_recorded" in event_types
+    graph_present = trace_path.with_name("process_graph.json").is_file()
+    artifacts_complete = terminal_status != "completed" or required_artifacts.issubset(observed_artifacts)
+    # The historical panel predates the public RunStatus contract.  Preserve
+    # its wording in the evaluator while keeping ``needs_clarification`` as
+    # the single API value exposed by the unified runtime.
+    evaluator_terminal_status = {
+        "needs_clarification": "needs_user_clarification",
+    }.get(terminal_status, terminal_status)
+    passed = (
+        evaluator_terminal_status in contract["allowed_terminal_by_condition"][condition_id]
+        and event_types[-1:] == ["run_completed"]
+        and artifacts_complete
+        and task_specific_evidence
+        and (not revision_required or revision_present)
+        and (not checkpoint_required or checkpoint_present)
+        and (not checkpoint_required or ndvi_action_count == 1)
+        and (not evaluator_case["condition"]["process_graph_from_run_facts"] or graph_present)
+    )
+    return {
+        "passed": passed,
+        "terminal_status": terminal_status,
+        "evaluator_terminal_status": evaluator_terminal_status,
+        "actions": actions,
+        "observed_artifacts": sorted(item for item in observed_artifacts if item),
+        "revision_present": revision_present,
+        "checkpoint_present": checkpoint_present,
+        "graph_present": graph_present,
+        "ndvi_action_count": ndvi_action_count,
         "task_specific_evidence": task_specific_evidence,
     }
