@@ -1,8 +1,19 @@
 # Agent handoff: unified-runtime checkpoint
 
+## Current execution authority
+
+Read `PLAN.md` first.  It freezes the remaining work into
+W1--W5 task packets and distinguishes the current offline method baseline from
+the later live-model evidence gate.  A workhorse chat must take exactly one
+packet; it must not redesign the thesis claim, comparison conditions, or
+legacy/new-system boundary.
+
 ## Safe starting point
 
 - Branch: `codex/ch1-unified-runtime`.
+- Branch relationship: it is two commits ahead of
+  `codex/ch1-baseline-20260811` (`64bfbdc`); the baseline and historical
+  notebook remain unchanged.
 - New-system authority: `ExpertsRSSystem.run()` / `.resume()` and
   `python -m ExpertsRS` from repository root.
 - Historical notebook: `ExpertsRS/ExpertsRS_notebook.ipynb`; keep it intact.
@@ -35,3 +46,7 @@ git diff --check
 Read `UNIFIED_RUNTIME_REVIEW_PACKET.md` before proposing an architectural
 change.  Live model/API work is explicitly out of scope until the researcher
 opens the documented approval gate.
+
+The 2026-08-13 verified test baseline is 75 passing tests.  Do not repeat the
+older 43-test figure from narrative material without refreshing its upstream
+evidence surfaces.
