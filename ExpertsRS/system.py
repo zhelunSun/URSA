@@ -13,12 +13,14 @@ from typing import Any
 from .decisions import DecisionProvider, ScriptedDecisionProvider, parse_role_decision
 from .models import (
     ArtifactRecord,
+    ExecutionMode,
     RunRequest,
     RunResult,
     RunStatus,
     ToolBinding,
     ValidationSummary,
 )
+from .provider import ProviderFailure, create_autogen_live_provider
 from .tools.output_context import use_output_directory
 from .tools.registry import get_tool_by_name
 from .workflow import (
@@ -84,7 +86,7 @@ class ExpertsRSSystem:
         executor: LocalToolExecutor | None = None,
         allowed_data_roots: list[str | Path] | None = None,
     ) -> None:
-        self.provider = provider or ScriptedDecisionProvider()
+        self.provider = provider
         self.executor = executor or LocalToolExecutor()
         self.allowed_data_roots = tuple(Path(path).resolve() for path in (allowed_data_roots or []))
 
@@ -103,6 +105,8 @@ class ExpertsRSSystem:
     }
 
     async def run(self, request: RunRequest) -> RunResult:
+        if self.provider is None:
+            self.provider = self._provider_for_request(request)
         run_id = request.run_id or f"run_{uuid.uuid4().hex[:12]}"
         run_dir = self._new_run_dir(request.output_dir, run_id)
         state = self._initial_state(request, run_id, run_dir)
@@ -144,6 +148,8 @@ class ExpertsRSSystem:
             "allowed_data_roots": [str(path) for path in allowed_roots],
             "budgets": request.budgets.model_dump(),
             "capabilities": request.capabilities.model_dump(),
+            "execution_mode": request.execution_mode.value,
+            "provider": self._provider_manifest(request),
             "status": "running",
             "phase": "initial",
             "user_answers": [],
@@ -200,6 +206,12 @@ class ExpertsRSSystem:
                         return self._stop(state, observation["message"], actor="Runtime")
                     if not state["capabilities"]["allow_plan_revision"]:
                         return self._stop(state, observation["message"], actor="Runtime")
+        except ProviderFailure as error:
+            state["status"] = RunStatus.FAILED
+            self._append_trace(
+                state, "provider_failed", {"code": error.code, "message": str(error)}, actor="Runtime"
+            )
+            return self._finish(state, report=None)
         except Exception as error:
             state["status"] = RunStatus.FAILED
             self._append_trace(state, "runtime_failed", {"error_type": type(error).__name__, "message": str(error)}, actor="Runtime")
@@ -405,6 +417,8 @@ class ExpertsRSSystem:
                 messages=state["messages"], tool_calls=state["tool_calls"], model_turns=state["model_turns"], plan_versions=state["plan_count"],
             ),
             trace_path=Path(state["run_dir"]) / "trace.jsonl", checkpoint_id=state.get("checkpoint_id"),
+            execution_mode=ExecutionMode(state["execution_mode"]),
+            provider=(state.get("provider") or {}).get("provider"),
         )
         self._write_files(state, result)
         return result
@@ -417,6 +431,16 @@ class ExpertsRSSystem:
         state["trace"] = trace.to_dict()
         (run_dir / "state.json").write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
         (run_dir / "result.json").write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        (run_dir / "manifest.json").write_text(
+            json.dumps({
+                "run_id": state["run_id"],
+                "execution_mode": state["execution_mode"],
+                "provider": state.get("provider"),
+                "budgets": state["budgets"],
+                "capabilities": state["capabilities"],
+            }, indent=2),
+            encoding="utf-8",
+        )
         if result.report:
             (run_dir / "report.md").write_text(result.report + "\n", encoding="utf-8")
         if state["capabilities"].get("allow_plan_revision"):
@@ -464,6 +488,27 @@ class ExpertsRSSystem:
     def _sync_trace(state: dict[str, Any]) -> None:
         # Events are mutated in place, but assigning makes the invariant explicit.
         state["trace"] = {"run_id": state["run_id"], "events": state["trace"]["events"]}
+
+    @staticmethod
+    def _provider_for_request(request: RunRequest) -> DecisionProvider:
+        if request.execution_mode == ExecutionMode.SCRIPTED_OFFLINE:
+            return ScriptedDecisionProvider()
+        assert request.provider is not None  # enforced by RunRequest
+        return create_autogen_live_provider(request.provider)
+
+    @staticmethod
+    def _provider_manifest(request: RunRequest) -> dict[str, Any]:
+        if request.execution_mode == ExecutionMode.SCRIPTED_OFFLINE:
+            return {"provider": "scripted", "model": "deterministic", "api_calls_permitted": False}
+        assert request.provider is not None
+        return {
+            "provider": request.provider.provider,
+            "model": request.provider.model,
+            "timeout_seconds": request.provider.timeout_seconds,
+            "temperature": request.provider.temperature,
+            "top_p": request.provider.top_p,
+            "api_calls_permitted": True,
+        }
 
 
 def run_sync(system: ExpertsRSSystem, request: RunRequest) -> RunResult:

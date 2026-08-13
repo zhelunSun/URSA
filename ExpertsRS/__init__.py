@@ -7,6 +7,8 @@ calling those entry points directly.
 
 from .models import (
     ArtifactRecord,
+    ExecutionMode,
+    ProviderConfig,
     RunBudgets,
     RunRequest,
     RunResult,
@@ -18,8 +20,10 @@ from .system import ExpertsRSSystem, LocalToolExecutor
 
 __all__ = [
     "ArtifactRecord",
+    "ExecutionMode",
     "ExpertsRSSystem",
     "LocalToolExecutor",
+    "ProviderConfig",
     "RunBudgets",
     "RunRequest",
     "RunResult",

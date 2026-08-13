@@ -6,7 +6,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class RunStatus(StrEnum):
@@ -14,6 +14,13 @@ class RunStatus(StrEnum):
     NEEDS_CLARIFICATION = "needs_clarification"
     CONTROLLED_STOP = "controlled_stop"
     FAILED = "failed"
+
+
+class ExecutionMode(StrEnum):
+    """Explicit execution identity; offline output is never live evidence."""
+
+    SCRIPTED_OFFLINE = "scripted-offline"
+    AUTOGEN_LIVE = "autogen-live"
 
 
 class RunBudgets(BaseModel):
@@ -25,6 +32,20 @@ class RunBudgets(BaseModel):
     max_tool_calls: int = Field(default=10, ge=1, le=100)
     max_tool_calls_scientist: int = Field(default=4, ge=0, le=100)
     max_tool_calls_engineer: int = Field(default=6, ge=0, le=100)
+
+
+class ProviderConfig(BaseModel):
+    """Non-secret configuration required to construct one approved live provider."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider: Literal["openai-compatible"] = "openai-compatible"
+    model: str = Field(min_length=1, max_length=200)
+    api_key_env: str = Field(default="EXPERTSRS_API_KEY", pattern=r"^[A-Z][A-Z0-9_]*$")
+    base_url_env: str = Field(default="EXPERTSRS_BASE_URL", pattern=r"^[A-Z][A-Z0-9_]*$")
+    timeout_seconds: int = Field(default=120, ge=1, le=3_600)
+    temperature: float = Field(default=0, ge=0, le=2)
+    top_p: float = Field(default=1, gt=0, le=1)
 
 
 DEFAULT_RESEARCH_BUDGETS = RunBudgets()
@@ -142,6 +163,8 @@ class RunRequest(BaseModel):
     run_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
     budgets: RunBudgets = DEFAULT_RESEARCH_BUDGETS
     capabilities: RuntimeCapabilities = RuntimeCapabilities()
+    execution_mode: ExecutionMode = ExecutionMode.SCRIPTED_OFFLINE
+    provider: ProviderConfig | None = None
 
     @field_validator("request")
     @classmethod
@@ -149,6 +172,14 @@ class RunRequest(BaseModel):
         if not value.strip():
             raise ValueError("request must not be blank")
         return value.strip()
+
+    @model_validator(mode="after")
+    def _provider_matches_execution_mode(self) -> "RunRequest":
+        if self.execution_mode == ExecutionMode.AUTOGEN_LIVE and self.provider is None:
+            raise ValueError("autogen-live requires explicit provider configuration")
+        if self.execution_mode == ExecutionMode.SCRIPTED_OFFLINE and self.provider is not None:
+            raise ValueError("scripted-offline must not carry live provider configuration")
+        return self
 
 
 class ArtifactRecord(BaseModel):
@@ -179,3 +210,5 @@ class RunResult(BaseModel):
     validation: ValidationSummary
     trace_path: Path
     checkpoint_id: str | None = None
+    execution_mode: ExecutionMode = ExecutionMode.SCRIPTED_OFFLINE
+    provider: str | None = None
