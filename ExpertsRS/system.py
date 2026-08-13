@@ -187,8 +187,7 @@ class ExpertsRSSystem:
                 engineer = await self._decide(state, "Engineer")
                 kind = engineer.get("kind")
                 if kind == "handoff":
-                    state["status"] = RunStatus.COMPLETED
-                    return self._finish(state, report=self._report(state))
+                    return await self._generate_manager_report(state)
                 if kind == "stop":
                     return self._stop(state, engineer.get("reason", "Engineer stopped safely."), actor="Engineer")
                 if kind == "revise":
@@ -228,6 +227,7 @@ class ExpertsRSSystem:
             "user_answers": state["user_answers"],
             "available_tools": [binding.model_dump(mode="json") for binding in self.TOOL_BINDINGS.values()],
             "observations": [self._redact_observation(item) for item in state["observations"]],
+            "artifact_manifest": [self._model_artifact_record(item) for item in state["artifacts"]],
             "remaining_tool_budget": budgets["max_tool_calls"] - state["tool_calls"],
         }
         raw_decision = await self.provider.decide(role, view)
@@ -404,6 +404,26 @@ class ExpertsRSSystem:
         self._append_trace(state, "run_terminal", {"status": RunStatus.CONTROLLED_STOP, "reason": reason}, actor=actor)
         return self._finish(state, report=None)
 
+    async def _generate_manager_report(self, state: dict[str, Any]) -> RunResult:
+        """Ask Manager for a report, then validate references against run facts."""
+        state["phase"] = "report"
+        try:
+            decision = await self._decide(state, "Manager")
+            if decision["kind"] != "report":
+                raise ValueError("Manager did not produce a report decision")
+            report = self._render_report(state, decision)
+        except Exception as error:
+            state["status"] = RunStatus.REPORT_FAILED
+            self._append_trace(
+                state, "report_failed", {"error_type": type(error).__name__, "message": str(error)}, actor="Runtime"
+            )
+            return self._finish(state, report=None)
+        state["status"] = RunStatus.COMPLETED
+        self._append_trace(
+            state, "report_validated", {"artifact_refs": decision["artifact_refs"]}, actor="Runtime"
+        )
+        return self._finish(state, report=report)
+
     def _finish(self, state: dict[str, Any], report: str | None) -> RunResult:
         trace = self._trace(state)
         status = RunStatus(state["status"])
@@ -450,9 +470,20 @@ class ExpertsRSSystem:
                 process_graph = {"status": "unavailable", "reason": str(error)}
             (run_dir / "process_graph.json").write_text(json.dumps(process_graph, indent=2), encoding="utf-8")
 
-    def _report(self, state: dict[str, Any]) -> str:
-        artifact_names = ", ".join(item["artifact_type"] for item in state["artifacts"])
-        return f"分析完成：{state['request']}。已生成并验证的制品：{artifact_names}。"
+    @staticmethod
+    def _model_artifact_record(record: dict[str, Any]) -> dict[str, str]:
+        return {"artifact_id": record["artifact_id"], "artifact_type": record["artifact_type"]}
+
+    def _render_report(self, state: dict[str, Any], decision: dict[str, Any]) -> str:
+        artifacts_by_id = {item["artifact_id"]: item for item in state["artifacts"]}
+        artifact_refs = decision["artifact_refs"]
+        if len(set(artifact_refs)) != len(artifact_refs):
+            raise ValueError("Report artifact references must be unique")
+        if set(artifact_refs) != set(artifacts_by_id):
+            raise ValueError("Report must reference exactly the validated artifact manifest")
+        lines = [decision["summary"].strip(), "", "已验证制品："]
+        lines.extend(f"- {artifacts_by_id[artifact_id]['artifact_type']} ({artifact_id})" for artifact_id in artifact_refs)
+        return "\n".join(lines)
 
     @staticmethod
     def _redact_observation(observation: dict[str, Any]) -> dict[str, Any]:

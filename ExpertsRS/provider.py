@@ -59,7 +59,8 @@ def _role_instructions() -> dict[str, str]:
         "Manager": (
             "Return exactly one JSON object: either "
             '{"kind":"clarify","question":"..."} or '
-            '{"kind":"handoff","target":"Scientist"}. '
+            '{"kind":"handoff","target":"Scientist"}, or, when phase is report, '
+            '{"kind":"report","summary":"...","artifact_refs":["artifact-id"]}. '
             "Do not include paths, data values, or prose outside JSON."
         ),
         "Scientist": (

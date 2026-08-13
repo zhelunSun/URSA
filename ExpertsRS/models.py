@@ -14,6 +14,7 @@ class RunStatus(StrEnum):
     NEEDS_CLARIFICATION = "needs_clarification"
     CONTROLLED_STOP = "controlled_stop"
     FAILED = "failed"
+    REPORT_FAILED = "report_failed"
 
 
 class ExecutionMode(StrEnum):

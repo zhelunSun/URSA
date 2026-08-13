@@ -40,9 +40,31 @@ class UnifiedSystemTests(unittest.TestCase):
             result_payload = json.loads((Path(directory) / "case" / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(result.status, RunStatus.COMPLETED)
         self.assertIn("NDVI", result.report)
+        self.assertIn("已验证制品", result.report)
         self.assertEqual({item.artifact_type for item in result.artifacts}, {"metadata", "index_raster", "map"})
         self.assertNotIn(str(SCENE), trace)
         self.assertEqual(result_payload["status"], "completed")
+
+    def test_report_failure_preserves_artifacts_and_records_terminal_state(self):
+        class ReportFailureProvider:
+            async def decide(self, role, state):
+                if role == "Manager" and state["phase"] == "report":
+                    return {"kind": "report", "summary": "Incorrect report.", "artifact_refs": []}
+                from ExpertsRS.decisions import ScriptedDecisionProvider
+                return await ScriptedDecisionProvider().decide(role, state)
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run("Map NDVI", Path(directory), system=ExpertsRSSystem(provider=ReportFailureProvider()))
+            trace = result.trace_path.read_text(encoding="utf-8")
+        self.assertEqual(result.status, RunStatus.REPORT_FAILED)
+        self.assertEqual({item.artifact_type for item in result.artifacts}, {"metadata", "index_raster", "map"})
+        self.assertIn("report_failed", trace)
+
+    def test_report_does_not_expose_artifact_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run("Map NDVI", Path(directory))
+        self.assertNotIn(str(SCENE), result.report)
+        self.assertNotIn(".tif", result.report)
 
     def test_recovery_reuses_ndvi_checkpoint_without_recomputing(self):
         system = ExpertsRSSystem(executor=LocalToolExecutor(inject_failures={"apply_threshold": 1}))

@@ -19,13 +19,14 @@ from .models import (
     EngineerStopDecision,
     ManagerClarifyDecision,
     ManagerHandoffDecision,
+    ReportDecision,
     ScientistPlanDecision,
     ScientistStopDecision,
 )
 
 
 ROLE_DECISION_MODELS: dict[str, tuple[type[Any], ...]] = {
-    "Manager": (ManagerClarifyDecision, ManagerHandoffDecision),
+    "Manager": (ManagerClarifyDecision, ManagerHandoffDecision, ReportDecision),
     "Scientist": (ScientistPlanDecision, ScientistStopDecision),
     "Engineer": (EngineerActionDecision, EngineerHandoffDecision, EngineerStopDecision, EngineerReviseDecision),
 }
@@ -89,6 +90,13 @@ class ScriptedDecisionProvider:
             return []
 
         if role == "Manager":
+            if phase == "report":
+                artifacts = state.get("artifact_manifest", [])
+                return {
+                    "kind": "report",
+                    "summary": f"已完成对“{state['request']}”的受控本地分析。结果仅包含下列已验证制品。",
+                    "artifact_refs": [item["artifact_id"] for item in artifacts],
+                }
             if operation in {"clarify_health", "clarify_scope"} and not state.get("user_answers"):
                 return {
                     "kind": "clarify",

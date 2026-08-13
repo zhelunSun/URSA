@@ -88,6 +88,7 @@ class AutoGenAdapterTests(unittest.TestCase):
             '{"kind":"action","tool_name":"calculate_ndvi"}',
             '{"kind":"action","tool_name":"plot_index_map","artifact_refs":["team:action:02:index_raster"]}',
             '{"kind":"handoff","target":"Manager"}',
+            '{"kind":"report","summary":"Completed local NDVI analysis.","artifact_refs":["team:action:01:metadata","team:action:02:index_raster","team:action:03:map"]}',
         ])
 
         class SequencedClient(type(self._client("{}"))):
