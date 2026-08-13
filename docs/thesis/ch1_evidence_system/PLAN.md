@@ -288,3 +288,231 @@ manifest 一律加章节前缀写作 `C1-B1/C1-B2/C1-B3`，与第二章 B0–B5 
 > 不得用当前 coverage 数字替代 WP1–WP3 合入后的最终测量。
 
 Chat B 合入并经高阶审查后再启动 WP2；不要提前让 WP2 writer 基于旧接口并行编码。
+
+## 10. 第二章与第三章对接计划
+
+### 10.1 对接目标与总原则
+
+目标不是把三个仓库合并成一个应用，而是让它们围绕同一次运行形成稳定的生产者—消费者关系：
+
+```text
+Chapter 2: evidence ledger → admitted scientific contract
+                                      ↓
+User → ExpertsRS runtime → plan/action/observation/report → RunResult + TrialExport
+                                      ↓
+Chapter 3: EvalTask → external graders → Outcome → Evaluation
+```
+
+三个事实源必须始终分开：
+
+1. **runtime facts（第一章）**：计划、动作、权限、工具 observation、artifact、checkpoint、终态；
+2. **scientific obligations（第二章）**：知识来源、适用条件、禁止推断、证据义务和应采取的响应；
+3. **evaluation facts（第三章）**：隐藏成功条件、故障注入、gold、grader 输出、人工评分和比较结论。
+
+第二章不得直接执行工具或写 runtime state；第三章不得预排 Agent 行动或把 gold 放进上下文；
+第一章不得自行声称科学正确，也不得读取 evaluator 的预期终态。
+
+### 10.2 接口所有权
+
+| 对象 | schema 所有者 | 生产者 | 消费者 | 稳定边界 |
+| --- | --- | --- | --- | --- |
+| `RunRequest/RunResult` | URSA | CLI/Python caller、runtime | 用户、Ch3 adapter | 当前主 API |
+| `PlanVersion/ActionSpec/RuntimeEvent/ArtifactRecord` | URSA | runtime | Ch2 port、Ch3 exporter | WP1 后冻结 v1 |
+| `ScientificContractBundle` | Chapter 2 | Ch2 compiler/admission pipeline | URSA constraint adapter | JSON + schema version + hash |
+| `ConstraintDecision` | URSA/Ch2 联合语义，URSA transport | Ch2 adapter | runtime | 固定动作词汇和映射 |
+| `EvalTask/Outcome/Evaluation` | Chapter 3 | Ch3 harness/graders | Ch3 analysis | agent-visible/private 双视图 |
+| `TrialExport` | URSA | runtime exporter | Ch3 harness | portable relative refs，无本地绝对路径 |
+| `CandidateUpdatePacket` | Chapter 2 | Ch2 episode adapter | Ch2 quarantine/review | 永远是 candidate，不在线改 ledger |
+
+schema 由生产者仓库维护，消费者只实现带版本检查的 Pydantic mirror/adapter。不得用跨仓库
+Python import、硬编码绝对路径或复制整个内部 state 建立耦合；跨仓库运输只使用版本化 JSON、
+相对 artifact 引用、hash 和明确 provenance。
+
+### 10.3 第二章端口：科学约束如何进入 runtime
+
+首版只增加一个依赖注入端口，不新增 Agent 或第二套调度器：
+
+```python
+class ScientificConstraintPort(Protocol):
+    async def prepare(self, context: TaskContext) -> ScientificContractBundle: ...
+    async def assess(
+        self,
+        bundle: ScientificContractBundle,
+        context: DecisionContext,
+    ) -> ConstraintDecision: ...
+```
+
+`TaskContext` 只包含脱敏请求、任务族、可见数据语义、可用工具名和预算；`DecisionContext` 只包含
+当前 plan/action/report 候选、精简 observation、artifact 类型和已有 contract refs。它们都不能包含
+路径、raster、gold、评分合同、未公开环境内容或 chain-of-thought。
+
+`ScientificContractBundle` 至少包含：
+
+- `schema_version / contract_id / contract_version / ledger_version / task_id`；
+- 1–3 个最小约束，每项含适用条件、禁止推断、所需证据、所需动作、风险和 residual uncertainty；
+- `source_claim_ids / evidence locators / verification status / admission decision`；
+- selector/compiler/prompt/source hashes 和 diagnostic/formal execution mode。
+
+正式运行中，只有 `admit` 或经审查 `narrow` 的约束能强制改变动作。candidate/needs-review bundle
+只能用于明确标记的 diagnostic run，不能生成 thesis-safe 科学结论。
+
+`ConstraintDecision` 动作词汇固定为：
+
+| Ch2 decision | runtime 确定性映射 |
+| --- | --- |
+| `pass` | 保持当前计划继续 |
+| `revise` | 交回 Scientist，生成带原因和 contract refs 的 `PlanVersion + 1` |
+| `add_validation` | 给计划加入必须完成的验证义务；未满足前不得报告成功 |
+| `ask` | 转为 `needs_clarification`，问题引用触发约束但不泄露内部 gold |
+| `reject` | `controlled_stop`，记录科学原因和被阻止的推断/动作 |
+| `downgrade` | 允许有限继续，但限制报告结论范围并携带 residual risk |
+| `escalate` | 首版映射为 `controlled_stop + human_review_required` 事件，不伪造自动解决 |
+
+调用点只保留三个，避免形成任意 hook 平台：
+
+1. Scientist 形成计划后、任何受影响动作执行前；
+2. 新 observation 可能改变适用条件或证据充分性时；
+3. Manager 最终报告提交前，用于结论校准和降级检查。
+
+运行结束后，runtime 可以把结构化 episode 摘要交给 Chapter 2 生成
+`CandidateUpdatePacket`；它必须进入 quarantine/admission review，不能在同一 run 中修改当前
+ledger 或 contract。这与 Chapter 2 已冻结的 serving/learning state 分离规则一致。
+
+### 10.4 第三章端口：runtime 如何进入独立系统验证
+
+第三章保留 `EvalTask → TrialTrace → Outcome → Evaluation`，但通过 adapter 使用统一底盘：
+
+1. Chapter 3 `EvalTaskAdapter` 只把 agent-visible 字段转换为 `RunRequest`；本地数据引用在 adapter/
+   runtime 内解析，不进入模型消息；
+2. `ExpertsRSSystem` 正常运行，不知道 expected outcome、rubric、fault seed 或 comparator label；
+3. URSA `TrialExporter` 把 `RunResult + trace + artifact manifest + provenance` 转成版本化
+   `TrialExport`；
+4. Chapter 3 grader 使用 private evaluator view 生成 `Outcome` 和 `Evaluation`。
+
+`EvalTask` 必须物理或结构化分成：
+
+- **agent-visible**：用户请求、允许输入、交互条件、预算和公开 intended use；
+- **evaluator-private**：成功断言、critical failure、gold/reference、fault plan、rubric 和评分权重。
+
+`TrialExport` 至少包含：schema/version、run/environment/system variant、code/model/prompt/config hashes、
+有序 runtime events、plan/contract/checkpoint refs、相对 artifact refs 与 hashes、终态、成本和
+intervention events。它不包含绝对路径、raster 内容、密钥、隐藏评分字段或私有 chain-of-thought。
+
+故障注入使用 evaluator 拥有的 `FaultInjectingExecutor` decorator：
+
+- decorator 在工具边界注入一次可审计故障，系统只看到与真实故障同构的 observation；
+- fault seed/预期响应只写 evaluator-private injection ledger；
+- Agent context 不出现 “injected”、task ID 对应答案或预设后续动作；
+- grader 通过 trial ID 关联 injection ledger 和 `TrialExport`，不要求 runtime 保存 gold。
+
+第三章分层评分保持外部化：outcome validity、workflow correctness、scientific reliability、failure
+behavior、user utility、efficiency 分别报告。`RunResult.validation` 仍只表示 runtime/contract/artifact
+完整性；Ch2 科学判断写 trace contract events；Ch3 的 `Evaluation` 独立保存，三者不能合成一个
+模糊的 `valid=True`。
+
+### 10.5 最小贯通测试
+
+| 层级 | 必须测试 | 证明范围 |
+| --- | --- | --- |
+| contract-unit | schema version、未知字段、缺证据、错误 hash、非法动作 | transport 和 fail-closed |
+| port-integration | NoOp/Fake Ch2 port 对同一候选返回 pass/revise/ask/reject/downgrade | runtime 映射正确 |
+| Ch2 diagnostic | 一个候选 contract 使计划增加验证，一个使报告降级 | 科学义务能改变可观察行为，不证明义务正确 |
+| exporter-integration | 同一 run 可稳定导出 `TrialExport`，路径/gold 泄漏检查通过 | Ch3 可消费运行证据 |
+| Ch3 deterministic MVP | artifact、终态、trace completeness、恢复范围 grader | 评估链闭合，不证明用户效用 |
+| cross-chapter offline | 一个任务贯通 contract → runtime → artifact/trace → evaluation | 三章接口兼容 |
+| live integration smoke | 固定模型运行一个 constrained task，外部 scorer 完成 | live 可用性，不是正式 Chapter 2/3 效果 |
+
+同输入、同 fake port、同 fault seed 的离线运行必须产生相同决策序列和评分。版本不兼容、bundle
+未 admission、artifact hash 不一致或 private 字段进入 agent view 时必须 fail closed。
+
+### 10.6 实施顺序与版本里程碑
+
+| 阶段 | 何时开始 | 工作 | 完成标志 |
+| --- | --- | --- | --- |
+| X0 接口冻结 | 现在，与 WP1 并行 | 审查 Ch2 bundle、Ch3 task/trace 资产；冻结上述 JSON 合同和两组例子 | proposal 获批，schema owner 明确 |
+| X1 provider examples | 现在，可由下游仓库并行 | Ch2 导出一个 diagnostic bundle；Ch3 导出一个 agent/private 分离 EvalTask | examples 可独立 schema validate |
+| X2 URSA ports | WP1 合入后，在独立分支 | `ScientificConstraintPort`、NoOp/Fake adapter、三调用点和 trace refs | port integration tests 通过 |
+| X3 C1 实验冻结 | WP1–WP4a 后 | 三次 smoke + 5×3；冻结 `v0.5.1` experiment commit | C1 claim-safe memo |
+| X4 Ch2 接入 | C1 15-run 后合入 X2 | 消费 Ch2 bundle，跑 1–2 个 diagnostic 行为改变案例 | 无第二调度器；plan/report 可观察改变 |
+| X5 Ch3 接入 | WP2/WP3 字段稳定后开发，C1 15-run 后合入 | `TrialExporter` + EvalTask adapter + deterministic graders | offline evaluation MVP |
+| X6 跨章 demo | X4+X5 | 同一任务贯通合同、runtime、工具、报告和外部评分 | `v0.7.0` integration demo |
+| X7 正式研究 | 各章人工 Gate 后 | Ch2 matched mechanism study；Ch3 task/user/system study | 分章结果，不用 demo 代替 |
+
+推荐版本语义：
+
+- `v0.5.1`：第一章真实模型 pilot 冻结版；
+- `v0.6.0`：extension-ready，具有 Ch2 port 和 portable TrialExport；
+- `v0.6.1`：一个 Chapter 2 diagnostic contract loop；
+- `v0.7.0`：Chapter 3 deterministic evaluation MVP 与跨章演示。
+
+X0 和两个 X1 schema/example 包可以现在并行；X2 只能在 WP1 合入后开始实现。X2 不得合入或
+改变正在冻结的 C1 5×3 experiment commit。最安全做法是单独
+`codex/ch1-cross-chapter-ports` 分支开发，C1 15-run 结束后再基于冻结 commit rebase/cherry-pick
+并重跑全部回归。这样既不阻塞接口工作，也不污染第一章 matched comparison。
+
+### 10.7 第二章的实际推进顺序
+
+1. 在 Chapter 2 先完成当前 human admission/claim boundary，不等待 URSA；
+2. 从现有 `task-conditioned-epistemic-contract` 中导出一个最小 JSON schema 和一个 diagnostic
+   example，保留 ledger/source/evidence/admission provenance；
+3. 用 URSA Fake port 先验证七种动作映射，不调用真实知识库或模型；
+4. 接一个真实导出 bundle，验证“增加验证步骤”和“报告降级”两个行为变化；
+5. 只有 admitted contract、gold 隔离和 matched context 通过后，才把它用于 Chapter 2 B0–B5/
+   四组正式实验；
+6. task episode 只能生成 candidate update，人工准入后在下一 ledger version 生效。
+
+这意味着第二章的知识核验、contract admission 和静态实验准备现在可以继续 P0 推进；它们不需要
+等第一章 live 5×3。需要等待的是“把正式 contract 接入被冻结 runtime 做行为实验”。
+
+### 10.8 第三章的实际推进顺序
+
+1. 现在做 E0：从北京制图资产中整理候选 task、environment、artifact、failure registry，不修改
+   冻结结果；
+2. 现在做 E1/E2：冻结 `EvalTask/TrialTrace/Outcome/Evaluation` schema 和 agent/private 双视图；
+3. 现在做 E3：实现只看现有 artifact/manifest/trace 的确定性 grader 和三个 replayable fault fixture；
+4. WP2/WP3 稳定后实现 `TrialExport` consumer adapter；
+5. C1 15-run 冻结后，比较 scripted/professional workflow、general tool Agent、structured URSA 的
+   deterministic MVP；scientific-constraint URSA 只有在 X4 后加入；
+6. Gate B 和伦理/数据边界通过后，才开展 6–10 个真实任务的专家/目标用户校准和重复 trial。
+
+第三章现在可以开展 E0–E3，无需等待完整系统；但它们只能叫 evaluation preparation。`v0.7.0`
+完成前不能称“稳定系统验证平台”，Gate B 前不能启动正式用户研究。
+
+### 10.9 “较完整、成熟升级”的阶段定义
+
+工程演示完成条件（`v0.7.0`）是：
+
+- 同一个用户请求进入唯一 runtime；
+- 一个版本化、可追溯且不泄漏答案的 Ch2 contract 对计划或报告产生可见影响；
+- Executor 产生真实 artifact 和 observation；
+- runtime 记录 plan/contract/action/checkpoint/artifact/terminal events；
+- Ch3 adapter 在系统外生成分层 `Outcome/Evaluation`；
+- NoOp Ch2、constrained Ch2 和 fault condition 使用相同系统入口；
+- 所有 schema/hash/权限/泄漏/失败分支测试通过。
+
+这可以称为“跨章可扩展的完整研究系统演示”，但仍不能替代 Chapter 2 科学约束效果实验、
+Chapter 3 grader 校准和真实用户研究。
+
+### 10.10 可立即发出的对接任务
+
+#### Cross-Chapter Chat X0（高阶模型，设计冻结）
+
+> 审查 URSA `PLAN.md` 第 10 节与 Chapter 2 的 task-conditioned epistemic contract、Chapter 3 的
+> EvalTask/TrialTrace 计划是否语义一致。只裁决 schema 所有权、动作词汇、agent/private 边界、
+> 版本/失败策略和首批例子；不实现代码、不改 chapter claim 或实验 gold。输出一份 accept/narrow/
+> reject 决策表和需要上游批准的最小问题。
+
+#### Chapter 2 Chat X1-K（workhorse，导出合同样例）
+
+> 在 Chapter 2 仓库只完成一个 `ScientificContractBundle` JSON Schema、一个 diagnostic example 和
+> validator。它必须从现有 contract spec 派生，包含 ledger/source/evidence/admission provenance，
+> 不含 gold 或完整参考答案，不调用 URSA、不升级 evidence status、不改变当前 S0 实验。
+
+#### Chapter 3 Chat X1-E（workhorse，任务/评估样例）
+
+> 在 Chapter 3 仓库只完成 `EvalTask` agent-visible/private schema、一个候选任务例子、最小
+> `Outcome/Evaluation` schema 和 validator。保留北京资产 provenance，不改 frozen mapping result，
+> 不启动用户研究，不把历史日志晋级为标准 trace 或 gold。
+
+X1-K 与 X1-E 可以互相独立并行；URSA X2 writer 必须等 WP1 接口合入，并以获批 schema/example
+为输入，不能自己重写第二、三章语义。

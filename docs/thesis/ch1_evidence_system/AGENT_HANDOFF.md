@@ -50,3 +50,8 @@ opens the documented approval gate.
 The 2026-08-13 verified test baseline is 75 passing tests.  Do not repeat the
 older 43-test figure from narrative material without refreshing its upstream
 evidence surfaces.
+
+For Chapter 2/3 integration, read `PLAN.md` section 10.  Provider repositories
+own their schemas and scientific/evaluation semantics; URSA owns only the
+runtime ports and portable trial export.  Cross-chapter port work must stay on
+a separate branch until the Chapter 1 live 5x3 experiment commit is frozen.
