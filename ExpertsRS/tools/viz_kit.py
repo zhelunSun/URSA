@@ -33,10 +33,10 @@ def _get_timestamp() -> str:
 
 def _ensure_results_dir() -> str:
     from .io_kit import _get_project_root
+    from .output_context import current_output_directory
+
     root = _get_project_root()
-    results = os.path.join(root, "results")
-    os.makedirs(results, exist_ok=True)
-    return results
+    return current_output_directory(os.path.join(root, "results"))
 
 
 def _get_geo_bounds(src) -> dict:

@@ -104,8 +104,10 @@ def _get_project_root() -> str:
 
 def _ensure_results_dir(subfolder: str = "") -> str:
     """Create results/ subfolder and return its absolute path."""
+    from .output_context import current_output_directory
+
     root = _get_project_root()
-    results = os.path.join(root, "results")
+    results = current_output_directory(os.path.join(root, "results"))
     if subfolder:
         results = os.path.join(results, subfolder)
     os.makedirs(results, exist_ok=True)

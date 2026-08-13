@@ -95,7 +95,11 @@ def build_operator_catalog() -> dict[str, OperatorSpec]:
     }
 
     # Keep the typed harness tied to, rather than divergent from, the tool layer.
-    from tools.registry import get_all_tools, list_tools
+    # The fallback preserves historical scripts that execute from ExpertsRS/.
+    try:
+        from ExpertsRS.tools.registry import get_all_tools, list_tools
+    except ModuleNotFoundError:
+        from tools.registry import get_all_tools, list_tools
     registered = set(list_tools())
     contracted = {operator.tool_name for operator in catalog.values()}
     if registered != contracted:

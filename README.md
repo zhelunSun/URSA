@@ -32,6 +32,24 @@ ExpertsRS is built based on [AutoGen](https://github.com/microsoft/autogen), and
   
 **You can check out the full implementation in: [`./ExpertsRS`](./ExpertsRS)**
 
+### Unified research runtime
+
+The current authoritative research entry point is a single Python API and CLI,
+which accepts a natural-language request plus permitted local GeoTIFF input,
+returns a report/artifacts/trace bundle, and can pause for clarification and
+resume with the same run ID:
+
+```powershell
+python -m ExpertsRS run --request "Map NDVI for Dongcheng" `
+  --data ExpertsRS/data/Sentinel2_Dongcheng_20230718.tif `
+  --output-dir ExpertsRS/results/unified
+```
+
+The published notebook and AG2 ReAct demo remain historical reproduction
+surfaces, not the current system entry point.  See
+[`system_convergence_audit_20260813.md`](docs/thesis/ch1_evidence_system/system_convergence_audit_20260813.md)
+for evidence boundaries and the capability-to-test matrix.
+
 ---
 
 ## Version Notes

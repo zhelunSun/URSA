@@ -1,5 +1,10 @@
 # ExpertsRS Workflow Runtime
 
+> **Authority:** `workflow/` is the domain control layer used by the unified
+> `ExpertsRSSystem` package.  New interactive runs start through
+> `python -m ExpertsRS`, not through the historical pilots below.  The pilots
+> remain no-API evidence fixtures.
+
 This package is a framework-independent harness layer added beside the published
 AutoGen notebook. It makes the existing remote-sensing tool layer inspectable
 before execution without altering the historical prototype.
