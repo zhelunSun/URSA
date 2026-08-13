@@ -47,6 +47,9 @@ class ProviderConfig(BaseModel):
     timeout_seconds: int = Field(default=120, ge=1, le=3_600)
     temperature: float = Field(default=0, ge=0, le=2)
     top_p: float = Field(default=1, gt=0, le=1)
+    max_completion_tokens: int = Field(default=6_000, ge=1, le=100_000)
+    max_retries: Literal[0] = 0
+    cache_enabled: Literal[False] = False
 
 
 DEFAULT_RESEARCH_BUDGETS = RunBudgets()

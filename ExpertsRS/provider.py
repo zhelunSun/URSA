@@ -48,8 +48,11 @@ def create_autogen_live_provider(config: ProviderConfig) -> AutoGenSelectorDecis
             model=config.model,
             api_key=api_key,
             base_url=base_url,
+            timeout=config.timeout_seconds,
+            max_retries=config.max_retries,
             temperature=config.temperature,
             top_p=config.top_p,
+            max_tokens=config.max_completion_tokens,
             model_info={
                 "vision": False,
                 "function_calling": False,

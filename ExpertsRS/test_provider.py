@@ -123,6 +123,10 @@ class ProviderTests(unittest.TestCase):
         try:
             provider = create_autogen_live_provider(config)
             self.assertIn("Manager", provider.agents)
+            client_config = provider.model_client._raw_config
+            self.assertEqual(client_config["timeout"], config.timeout_seconds)
+            self.assertEqual(client_config["max_retries"], 0)
+            self.assertEqual(client_config["max_tokens"], config.max_completion_tokens)
             with patch("autogen_ext.models.openai.OpenAIChatCompletionClient", side_effect=RuntimeError("secret-value")):
                 with self.assertRaisesRegex(ProviderFailure, "RuntimeError") as captured:
                     create_autogen_live_provider(config)
@@ -130,6 +134,25 @@ class ProviderTests(unittest.TestCase):
         finally:
             os.environ.pop("WP4_KEY", None)
             os.environ.pop("WP4_URL", None)
+
+    def test_live_manifest_freezes_sampling_retry_cache_and_token_limits(self):
+        class SafeProvider:
+            async def decide(self, role, state):
+                return {"kind": "clarify", "question": "Which output is needed?"}
+
+        config = ProviderConfig(model="test-model", max_completion_tokens=321)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            asyncio.run(ExpertsRSSystem(provider=SafeProvider()).run(RunRequest(
+                request="Map NDVI", data_paths=[SCENE], output_dir=root, run_id="limits",
+                execution_mode=ExecutionMode.AUTOGEN_LIVE, provider=config,
+            )))
+            manifest = json.loads((root / "limits" / "manifest.json").read_text(encoding="utf-8"))
+        provider_manifest = manifest["provider"]
+        self.assertEqual(provider_manifest["temperature"], 0)
+        self.assertEqual(provider_manifest["max_completion_tokens"], 321)
+        self.assertEqual(provider_manifest["max_retries"], 0)
+        self.assertFalse(provider_manifest["cache_enabled"])
 
     def test_provider_failure_preserves_partial_trace_without_fallback(self):
         class TimeoutProvider:

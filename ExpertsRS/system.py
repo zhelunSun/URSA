@@ -555,6 +555,9 @@ class ExpertsRSSystem:
             "timeout_seconds": request.provider.timeout_seconds,
             "temperature": request.provider.temperature,
             "top_p": request.provider.top_p,
+            "max_completion_tokens": request.provider.max_completion_tokens,
+            "max_retries": request.provider.max_retries,
+            "cache_enabled": request.provider.cache_enabled,
             "api_calls_permitted": True,
             **ExpertsRSSystem._provenance_manifest(),
         }
