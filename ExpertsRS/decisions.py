@@ -219,12 +219,25 @@ class AutoGenSelectorDecisionProvider:
             raise classify_provider_exception(error) from error
         messages = getattr(response, "messages", [])
         role_messages = [message for message in messages if getattr(message, "source", None) == role.lower()]
-        content = getattr(role_messages[-1], "content", None) if role_messages else None
+        message = role_messages[-1] if role_messages else None
+        content = getattr(message, "content", None)
         if not isinstance(content, str):
             raise ValueError(f"{role} produced no textual structured decision")
         decision = json.loads(content)
         if not isinstance(decision, dict) or not isinstance(decision.get("kind"), str):
             raise ValueError(f"{role} produced an invalid structured decision")
+        usage = getattr(message, "models_usage", None)
+        if usage is None:
+            raise ValueError(f"{role} response omitted provider usage metadata")
+        prompt_tokens = getattr(usage, "prompt_tokens", None)
+        completion_tokens = getattr(usage, "completion_tokens", None)
+        if not isinstance(prompt_tokens, int) or not isinstance(completion_tokens, int):
+            raise ValueError(f"{role} response has invalid provider usage metadata")
+        decision["_provider_usage"] = {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        }
         return decision
 
     async def save_state(self) -> dict[str, Any]:

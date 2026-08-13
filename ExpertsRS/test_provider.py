@@ -67,7 +67,10 @@ class ProviderTests(unittest.TestCase):
     def test_live_manifest_never_contains_the_provider_key(self):
         class SafeProvider:
             async def decide(self, role, state):
-                return {"kind": "clarify", "question": "Which output is needed?"}
+                return {
+                    "kind": "clarify", "question": "Which output is needed?",
+                    "_provider_usage": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3},
+                }
 
         config = ProviderConfig(model="test-model", api_key_env="WP2_KEY", base_url_env="WP2_URL")
         with tempfile.TemporaryDirectory() as directory:

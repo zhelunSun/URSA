@@ -33,6 +33,8 @@ class RunBudgets(BaseModel):
     max_tool_calls: int = Field(default=10, ge=1, le=100)
     max_tool_calls_scientist: int = Field(default=4, ge=0, le=100)
     max_tool_calls_engineer: int = Field(default=6, ge=0, le=100)
+    max_wall_time_seconds: int = Field(default=300, ge=1, le=3_600)
+    max_total_tokens_recorded: int = Field(default=18_000, ge=1, le=1_000_000)
 
 
 class ProviderConfig(BaseModel):

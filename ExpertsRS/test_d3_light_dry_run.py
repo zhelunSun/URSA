@@ -1,10 +1,12 @@
 """No-API tests for the shared D3-light runner and frozen protocol."""
 
 import asyncio
+from copy import deepcopy
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from evaluation.ch1.d3_light_loader import load_panel
 from evaluation.ch1.d3_light_protocol import (
@@ -14,8 +16,11 @@ from evaluation.ch1.d3_light_protocol import (
     build_case_slots,
     write_dry_run_manifests,
 )
-from evaluation.ch1.d3_light_runner import D3LightRunner, DeterministicDryRunProvider, run_unified_d3_case
+from evaluation.ch1.d3_light_runner import (
+    D3LightRunner, DeterministicDryRunProvider, run_authorized_d3_smoke, run_unified_d3_case,
+)
 from evaluation.ch1.d3_light_tool_executor import D3LightToolExecutor
+from evaluation.ch1 import run_d3_light_model_smoke
 from evaluation.ch1.run_d3_light_dry_run import run_all_dry_cases, run_all_unified_dry_cases
 
 
@@ -119,6 +124,60 @@ class D3LightDryRunTests(unittest.TestCase):
         self.assertEqual(len(paths), 15)
         self.assertTrue(all(payload["mode"] == "unified_runtime_scripted_offline" for payload in payloads))
         self.assertTrue(all(payload["evaluation"]["passed"] for payload in payloads))
+
+    def test_live_smoke_refuses_to_run_without_both_gates(self):
+        slot = next(slot for slot in build_case_slots(self.panel) if slot.source_task_id == 2)
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(RuntimeError, "requires both"):
+                asyncio.run(run_authorized_d3_smoke(Path(directory), object(), slots=[slot]))
+
+    def test_opened_smoke_gate_uses_unified_live_runtime_without_network(self):
+        from ExpertsRS import ExecutionMode, ExpertsRSSystem, ProviderConfig
+
+        panel = deepcopy(self.panel)
+        panel["run_gate"]["api_calls_authorized"] = True
+        slot = next(
+            item for item in build_case_slots(panel)
+            if item.source_task_id == 13 and item.condition_id == "B2_adaptive"
+        )
+
+        class ClarifyingProvider:
+            async def decide(self, role, state):
+                self.assertEqual(role, "Manager")
+                return {
+                    "kind": "clarify", "question": "Please define vegetation health.",
+                    "_provider_usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5},
+                }
+
+            def assertEqual(self, left, right):
+                if left != right:
+                    raise AssertionError(f"expected {right}, got {left}")
+
+        old_gate = __import__("os").environ.get(API_GATE_ENV)
+        __import__("os").environ[API_GATE_ENV] = "YES"
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                records = asyncio.run(run_authorized_d3_smoke(
+                    Path(directory), ProviderConfig(model="fake-live-model"), slots=[slot], panel=panel,
+                    system_factory=lambda _: ExpertsRSSystem(provider=ClarifyingProvider()),
+                ))
+        finally:
+            if old_gate is None:
+                __import__("os").environ.pop(API_GATE_ENV, None)
+            else:
+                __import__("os").environ[API_GATE_ENV] = old_gate
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["mode"], "unified_runtime_autogen_live")
+        self.assertEqual(records[0]["result"]["execution_mode"], ExecutionMode.AUTOGEN_LIVE.value)
+        self.assertTrue(records[0]["evaluation"]["passed"])
+
+    def test_smoke_entry_loads_only_the_untracked_expertsrs_environment_file(self):
+        with patch("evaluation.ch1.run_d3_light_model_smoke.load_dotenv") as load_dotenv:
+            run_d3_light_model_smoke._load_untracked_environment()
+        configured_path = load_dotenv.call_args.args[0]
+        self.assertEqual(configured_path.name, ".env")
+        self.assertEqual(configured_path.parent.name, "ExpertsRS")
+        self.assertFalse(load_dotenv.call_args.kwargs["override"])
 
 
 if __name__ == "__main__":

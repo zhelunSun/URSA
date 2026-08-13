@@ -7,7 +7,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from .models import ExecutionMode, ProviderConfig, RunRequest
+from .models import ExecutionMode, ProviderConfig, RunBudgets, RunRequest
 from .provider import ProviderFailure
 from .system import ExpertsRSSystem
 
@@ -29,6 +29,12 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--api-key-env", default="EXPERTSRS_API_KEY", help="Environment variable containing the live provider key.")
     run.add_argument("--base-url-env", default="EXPERTSRS_BASE_URL", help="Environment variable containing the provider base URL.")
     run.add_argument("--timeout-seconds", type=int, default=120)
+    run.add_argument("--max-model-turns", type=int, default=12)
+    run.add_argument("--max-tool-calls", type=int, default=10)
+    run.add_argument("--max-tool-calls-engineer", type=int, default=6)
+    run.add_argument("--max-wall-time-seconds", type=int, default=300)
+    run.add_argument("--max-total-tokens-recorded", type=int, default=18_000)
+    run.add_argument("--max-completion-tokens", type=int, default=6_000)
     resume = commands.add_parser("resume", help="Resume a run waiting for clarification.")
     resume.add_argument("--run-id", required=True)
     resume.add_argument("--answer", required=True)
@@ -47,12 +53,20 @@ async def _main_async(args: argparse.Namespace) -> int:
                 ProviderConfig(
                     provider=args.provider, model=args.model, api_key_env=args.api_key_env,
                     base_url_env=args.base_url_env, timeout_seconds=args.timeout_seconds,
+                    max_completion_tokens=args.max_completion_tokens,
                 )
                 if mode == ExecutionMode.AUTOGEN_LIVE else None
             )
             result = await system.run(RunRequest(
                 request=args.request, data_paths=args.data, output_dir=args.output_dir, run_id=args.run_id,
                 execution_mode=mode, provider=provider,
+                budgets=RunBudgets(
+                    max_model_turns=args.max_model_turns,
+                    max_tool_calls=args.max_tool_calls,
+                    max_tool_calls_engineer=args.max_tool_calls_engineer,
+                    max_wall_time_seconds=args.max_wall_time_seconds,
+                    max_total_tokens_recorded=args.max_total_tokens_recorded,
+                ),
             ))
         else:
             result = await system.resume(args.run_id, args.answer, args.output_dir)

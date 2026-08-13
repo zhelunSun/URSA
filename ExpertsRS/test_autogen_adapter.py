@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 try:
@@ -76,7 +78,10 @@ class AutoGenAdapterTests(unittest.TestCase):
             "Engineer": "Return JSON decisions.",
         })
         decision = asyncio.run(provider.decide("Manager", {"request": "NDVI", "phase": "initial"}))
-        self.assertEqual(decision, {"kind": "handoff", "target": "Scientist"})
+        self.assertEqual(decision, {
+            "kind": "handoff", "target": "Scientist",
+            "_provider_usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        })
         state = asyncio.run(provider.save_state())
         self.assertTrue(state["agent_states"]["manager"]["agent_state"]["llm_context"]["messages"])
 
@@ -104,7 +109,6 @@ class AutoGenAdapterTests(unittest.TestCase):
             "Scientist": "Return JSON decisions.",
             "Engineer": "Return JSON decisions.",
         })
-        import json
         import tempfile
         scene = Path(__file__).parent / "data" / "Sentinel2_Dongcheng_20230718.tif"
         with tempfile.TemporaryDirectory() as directory:
@@ -115,6 +119,39 @@ class AutoGenAdapterTests(unittest.TestCase):
         self.assertEqual(result.status, RunStatus.COMPLETED)
         self.assertIn("provider_state", state)
         self.assertIn("agent_states", state["provider_state"])
+
+    def test_live_run_records_usage_and_stops_at_total_token_budget(self):
+        from ExpertsRS import ExecutionMode, ProviderConfig, RunBudgets
+
+        responses = iter([
+            '{"kind":"handoff","target":"Scientist"}',
+            '{"kind":"plan","operation":"ndvi","next_action":"read_raster_metadata"}',
+        ])
+
+        class SequencedClient(type(self._client("{}"))):
+            async def create(self, *args, **kwargs):
+                from autogen_core.models import CreateResult, RequestUsage
+                return CreateResult(
+                    finish_reason="stop", content=next(responses),
+                    usage=RequestUsage(prompt_tokens=2, completion_tokens=2), cached=False,
+                )
+
+        provider = AutoGenSelectorDecisionProvider.create(SequencedClient(), {
+            "Manager": "Return JSON decisions.",
+            "Scientist": "Return JSON decisions.",
+            "Engineer": "Return JSON decisions.",
+        })
+        scene = Path(__file__).parent / "data" / "Sentinel2_Dongcheng_20230718.tif"
+        with tempfile.TemporaryDirectory() as directory:
+            result = asyncio.run(ExpertsRSSystem(provider=provider).run(RunRequest(
+                request="Map NDVI", data_paths=[scene], output_dir=Path(directory), run_id="usage",
+                execution_mode=ExecutionMode.AUTOGEN_LIVE, provider=ProviderConfig(model="test-model"),
+                budgets=RunBudgets(max_total_tokens_recorded=3),
+            )))
+            manifest = json.loads((Path(directory) / "usage" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(result.status, RunStatus.CONTROLLED_STOP)
+        self.assertEqual(manifest["token_usage"]["total_tokens"], 4)
+        self.assertEqual(manifest["provider"]["actual_usage"]["total_tokens"], 4)
 
 
 if __name__ == "__main__":

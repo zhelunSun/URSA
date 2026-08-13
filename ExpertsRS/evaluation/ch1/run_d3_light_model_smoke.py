@@ -1,22 +1,58 @@
-"""Guarded entry point for the future unified-runtime D3 live smoke.
-
-The D3 local-tool fixtures remain evaluator-only until an approved model
-provider adapter has been wired into ``ExpertsRSSystem``.  This module must not
-fall back to the former direct D3 runner, which preselected role phases and
-therefore was not a valid agent-system execution.
-"""
+"""Double-gated entry point for three authoritative D3 live smoke cases."""
 
 from __future__ import annotations
 
+import asyncio
+import os
 from pathlib import Path
+from typing import Any
 
-def run_authorized_model_smoke(destination: str | Path) -> list[Path]:
-    del destination
-    raise RuntimeError(
-        "D3 live execution is not yet authorized: configure and test a modern "
-        "AutoGen decision provider for ExpertsRSSystem, then review the frozen "
-        "provider/model, budget, disclosure and evaluator protocol."
+from dotenv import load_dotenv
+
+from ExpertsRS import ProviderConfig
+
+from .d3_light_protocol import build_case_slots
+from .d3_light_runner import run_authorized_d3_smoke
+from .d3_light_loader import load_panel
+
+
+def _load_untracked_environment() -> None:
+    """Load local credentials without overriding explicitly supplied variables."""
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
+
+
+def _provider_config_from_environment() -> ProviderConfig:
+    """Read identifiers only; the API key itself stays in the environment."""
+    model = os.getenv("EXPERTSRS_D3_LIGHT_MODEL", "")
+    api_key_env = os.getenv("EXPERTSRS_D3_LIGHT_API_KEY_ENV", "")
+    base_url_env = os.getenv("EXPERTSRS_D3_LIGHT_BASE_URL_ENV", "")
+    if not model or not api_key_env or not base_url_env:
+        raise RuntimeError(
+            "Set EXPERTSRS_D3_LIGHT_MODEL, EXPERTSRS_D3_LIGHT_API_KEY_ENV, and "
+            "EXPERTSRS_D3_LIGHT_BASE_URL_ENV before a reviewed live smoke."
+        )
+    return ProviderConfig(
+        model=model, api_key_env=api_key_env, base_url_env=base_url_env,
+        max_completion_tokens=int(os.getenv("EXPERTSRS_D3_LIGHT_MAX_COMPLETION_TOKENS", "1024")),
     )
+
+
+def smoke_slots() -> list[Any]:
+    """S1 NDVI, S2 recovery, S3 clarification; one reviewed slot each."""
+    panel = load_panel()
+    by_key = {(slot.source_task_id, slot.condition_id): slot for slot in build_case_slots(panel)}
+    return [
+        by_key[(2, "B2_adaptive")],
+        by_key[(11, "B3_checkpoint")],
+        by_key[(13, "B2_adaptive")],
+    ]
+
+
+def run_authorized_model_smoke(destination: str | Path) -> list[dict[str, Any]]:
+    _load_untracked_environment()
+    return asyncio.run(run_authorized_d3_smoke(
+        destination, _provider_config_from_environment(), slots=smoke_slots(),
+    ))
 
 
 def main() -> None:

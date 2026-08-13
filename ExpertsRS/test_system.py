@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import json
 import tempfile
 import unittest
@@ -11,11 +12,11 @@ import sys
 
 try:
     from ExpertsRS import ExpertsRSSystem, LocalToolExecutor, RunRequest, RunStatus
-    from ExpertsRS.models import RuntimeCapabilities
+    from ExpertsRS.models import RunBudgets, RuntimeCapabilities
 except ModuleNotFoundError:  # Support ``python -m unittest discover`` in ExpertsRS/.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from ExpertsRS import ExpertsRSSystem, LocalToolExecutor, RunRequest, RunStatus
-    from ExpertsRS.models import RuntimeCapabilities
+    from ExpertsRS.models import RunBudgets, RuntimeCapabilities
 
 
 SCENE = Path(__file__).parent / "data" / "Sentinel2_Dongcheng_20230718.tif"
@@ -153,6 +154,23 @@ class UnifiedSystemTests(unittest.TestCase):
         self.assertEqual(result.status, RunStatus.FAILED)
         self.assertEqual(result.validation.tool_calls, 0)
         self.assertIn("invalid_model_decision", trace)
+
+    def test_wall_time_budget_stops_before_provider_execution(self):
+        class UnexpectedProvider:
+            async def decide(self, role, state):
+                raise AssertionError("provider must not run after wall-time expiry")
+
+        with tempfile.TemporaryDirectory() as directory:
+            system = ExpertsRSSystem(provider=UnexpectedProvider())
+            state = system._initial_state(
+                RunRequest(request="Map NDVI", data_paths=[SCENE], output_dir=Path(directory), run_id="wall", budgets=RunBudgets(max_wall_time_seconds=1)),
+                "wall", Path(directory) / "wall",
+            )
+            state["started_at_unix"] = time.time() - 2
+            (Path(directory) / "wall").mkdir()
+            result = asyncio.run(system._drive(state))
+        self.assertEqual(result.status, RunStatus.CONTROLLED_STOP)
+        self.assertEqual(result.validation.tool_calls, 0)
 
     def test_unknown_tool_and_unsafe_action_contract_stop_without_execution(self):
         class ActionProvider:

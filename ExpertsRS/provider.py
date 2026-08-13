@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from urllib.parse import urlsplit
 
 from .decisions import AutoGenSelectorDecisionProvider
 from .models import ProviderConfig
@@ -66,6 +67,15 @@ def create_autogen_live_provider(config: ProviderConfig) -> AutoGenSelectorDecis
         raise
     except Exception as error:
         raise ProviderFailure("provider_initialization_failed", type(error).__name__) from error
+
+
+def redacted_provider_base_url(config: ProviderConfig) -> str:
+    """Return only the stable endpoint identity that may enter a manifest."""
+    raw = os.getenv(config.base_url_env, "")
+    parsed = urlsplit(raw)
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}/..."
+    return "configured_unparseable_endpoint" if raw else "not_configured"
 
 
 def _role_instructions() -> dict[str, str]:

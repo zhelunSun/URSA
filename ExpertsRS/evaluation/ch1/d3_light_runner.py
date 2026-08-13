@@ -29,7 +29,7 @@ except ImportError:  # pragma: no cover - legacy invocation from ExpertsRS/.
 # entry point through ``run_unified_d3_case`` at the end of this module.
 
 from .d3_light_loader import build_agent_case, build_evaluator_case, load_panel
-from .d3_light_protocol import D3CaseSlot
+from .d3_light_protocol import D3CaseSlot, api_calls_permitted, balanced_case_order, build_case_slots
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -497,6 +497,7 @@ async def run_unified_d3_case(
     *,
     destination: str | Path,
     system: Any | None = None,
+    provider_config: Any | None = None,
 ) -> Any:
     """Run one D3 case through the authoritative ExpertsRS API.
 
@@ -506,11 +507,11 @@ async def run_unified_d3_case(
     the reviewed task-11 fixture.
     """
     try:
-        from ExpertsRS import ExpertsRSSystem, LocalToolExecutor, RunRequest, RuntimeCapabilities
+        from ExpertsRS import ExpertsRSSystem, LocalToolExecutor, RunBudgets, RunRequest, RuntimeCapabilities
     except ModuleNotFoundError:  # Legacy test invocation executes from ExpertsRS/.
         import sys
         sys.path.insert(0, str(ROOT.parent))
-        from ExpertsRS import ExpertsRSSystem, LocalToolExecutor, RunRequest, RuntimeCapabilities
+        from ExpertsRS import ExpertsRSSystem, LocalToolExecutor, RunBudgets, RunRequest, RuntimeCapabilities
 
     panel = load_panel()
     agent_case = build_agent_case(panel, slot.source_task_id, slot.condition_id)
@@ -528,10 +529,65 @@ async def run_unified_d3_case(
     source = Path(panel["fixed_context"]["raster"])
     if not source.is_absolute():
         source = ROOT / "data" / source.name
+    budget_config = panel["proposed_run_protocol"]["per_run_budget"]
+    budgets = RunBudgets(
+        max_model_turns=budget_config["max_model_turns"],
+        max_tool_calls=budget_config["max_tool_calls"],
+        max_tool_calls_scientist=budget_config["max_tool_calls_scientist"],
+        max_tool_calls_engineer=budget_config["max_tool_calls_engineer"],
+        max_wall_time_seconds=budget_config["max_wall_time_seconds"],
+        max_total_tokens_recorded=budget_config["max_total_tokens_recorded"],
+    )
     return await system.run(RunRequest(
         request=agent_case["request"], data_paths=[source], output_dir=Path(destination),
-        run_id=slot.case_id.replace("__", "_"), capabilities=capabilities,
+        run_id=slot.case_id.replace("__", "_"), capabilities=capabilities, budgets=budgets,
+        execution_mode=("autogen-live" if provider_config is not None else "scripted-offline"),
+        provider=provider_config,
     ))
+
+
+async def run_authorized_d3_smoke(
+    destination: str | Path,
+    provider_config: Any,
+    *,
+    slots: list[D3CaseSlot] | None = None,
+    panel: dict[str, Any] | None = None,
+    system_factory: Any | None = None,
+) -> list[dict[str, Any]]:
+    """Run reviewed smoke slots via the authoritative live runtime only.
+
+    The frozen panel must explicitly open its reviewed gate *and* the local
+    environment must set ``EXPERTSRS_D3_LIGHT_ALLOW_API=YES``.  Each slot keeps
+    its own non-overwriting run directory; any failed evaluator result stops
+    the batch immediately and preserves the partial run for review.
+    """
+    panel = panel or load_panel()
+    if not api_calls_permitted(panel):
+        raise RuntimeError("D3 live smoke requires both the reviewed panel gate and EXPERTSRS_D3_LIGHT_ALLOW_API=YES")
+    selected = slots or balanced_case_order(build_case_slots(panel))
+    root = Path(destination)
+    root.mkdir(parents=True, exist_ok=True)
+    results: list[dict[str, Any]] = []
+    for slot in selected:
+        system = system_factory(slot) if system_factory is not None else None
+        result = await run_unified_d3_case(
+            slot, destination=root, system=system, provider_config=provider_config,
+        )
+        evaluation = evaluate_unified_d3_run(
+            result, build_evaluator_case(panel, slot.source_task_id, slot.condition_id),
+        )
+        record = {
+            "case_id": slot.case_id,
+            "mode": "unified_runtime_autogen_live",
+            "result": result.model_dump(mode="json"),
+            "evaluation": evaluation,
+        }
+        path = root / f"{len(results) + 1:02d}_{slot.case_id}.json"
+        path.write_text(__import__("json").dumps(record, indent=2), encoding="utf-8")
+        results.append(record)
+        if not evaluation["passed"]:
+            raise RuntimeError(f"D3 live smoke evaluator failed: {slot.case_id}: {evaluation}")
+    return results
 
 
 def evaluate_unified_d3_run(result: Any, evaluator_case: dict[str, Any]) -> dict[str, Any]:

@@ -7,6 +7,7 @@ import json
 import shutil
 import hashlib
 import subprocess
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,7 +23,7 @@ from .models import (
     ToolBinding,
     ValidationSummary,
 )
-from .provider import ProviderFailure, create_autogen_live_provider
+from .provider import ProviderFailure, create_autogen_live_provider, redacted_provider_base_url
 from .tools.output_context import use_output_directory
 from .tools.registry import get_tool_by_name
 from .workflow import (
@@ -130,6 +131,7 @@ class ExpertsRSSystem:
         state.setdefault("user_answers", []).append(answer.strip())
         state["status"] = "running"
         state["phase"] = "planning"
+        state["started_at_unix"] = time.time()
         self._append_trace(state, "user_clarification_received", {"answer": answer.strip()}, actor="User")
         return await self._drive(state)
 
@@ -169,10 +171,22 @@ class ExpertsRSSystem:
             "tool_calls": 0,
             "model_turns": 0,
             "role_tool_calls": {"Scientist": 0, "Engineer": 0},
+            "token_usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            "started_at_unix": time.time(),
             "messages": [],
         }
 
     async def _drive(self, state: dict[str, Any]) -> RunResult:
+        elapsed = max(0.0, time.time() - float(state.get("started_at_unix", time.time())))
+        remaining = state["budgets"]["max_wall_time_seconds"] - elapsed
+        if remaining <= 0:
+            return self._stop(state, "wall_time_budget_exhausted", actor="Runtime")
+        try:
+            return await asyncio.wait_for(self._drive_within_wall_budget(state), timeout=remaining)
+        except TimeoutError:
+            return self._stop(state, "wall_time_budget_exhausted", actor="Runtime")
+
+    async def _drive_within_wall_budget(self, state: dict[str, Any]) -> RunResult:
         trace = self._trace(state)
         try:
             await self._restore_provider_state(state)
@@ -241,6 +255,7 @@ class ExpertsRSSystem:
             "remaining_tool_budget": budgets["max_tool_calls"] - state["tool_calls"],
         }
         raw_decision = await self.provider.decide(role, view)
+        self._record_provider_usage(state, raw_decision)
         try:
             decision = parse_role_decision(role, raw_decision)
         except ValueError as error:
@@ -251,6 +266,30 @@ class ExpertsRSSystem:
         await self._persist_provider_state(state)
         self._append_trace(state, "agent_decision", {"role": role, "decision": decision}, actor=role)
         return decision
+
+    def _record_provider_usage(self, state: dict[str, Any], raw_decision: dict[str, Any]) -> None:
+        """Account for provider-reported tokens before the next model request."""
+        if not isinstance(raw_decision, dict):
+            if state["execution_mode"] == ExecutionMode.AUTOGEN_LIVE.value:
+                raise ProviderFailure("provider_response_invalid", "The provider response is not a decision object.")
+            return
+        usage = raw_decision.pop("_provider_usage", None)
+        if state["execution_mode"] != ExecutionMode.AUTOGEN_LIVE.value:
+            return
+        if not isinstance(usage, dict) or any(
+            not isinstance(usage.get(key), int) or usage[key] < 0
+            for key in ("prompt_tokens", "completion_tokens", "total_tokens")
+        ):
+            raise ProviderFailure("provider_usage_missing", "The provider response omitted valid token usage metadata.")
+        if usage["total_tokens"] != usage["prompt_tokens"] + usage["completion_tokens"]:
+            raise ProviderFailure("provider_usage_invalid", "The provider response reported inconsistent token usage.")
+        totals = state.setdefault("token_usage", {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+        for key in totals:
+            totals[key] += usage[key]
+        state["provider"]["actual_usage"] = dict(totals)
+        self._append_trace(state, "provider_usage_recorded", dict(totals), actor="Runtime")
+        if totals["total_tokens"] > state["budgets"]["max_total_tokens_recorded"]:
+            raise BudgetExhausted("total_token_budget_exhausted")
 
     async def _restore_provider_state(self, state: dict[str, Any]) -> None:
         """Restore only optional framework state; runtime state remains canonical."""
@@ -426,6 +465,8 @@ class ExpertsRSSystem:
             if decision["kind"] != "report":
                 raise ValueError("Manager did not produce a report decision")
             report = self._render_report(state, decision)
+        except (BudgetExhausted, ProviderFailure):
+            raise
         except Exception as error:
             state["status"] = RunStatus.REPORT_FAILED
             self._append_trace(
@@ -470,9 +511,11 @@ class ExpertsRSSystem:
                 "run_id": state["run_id"],
                 "execution_mode": state["execution_mode"],
                 "provider": state.get("provider"),
-                "budgets": state["budgets"],
-                "capabilities": state["capabilities"],
-            }, indent=2),
+            "budgets": state["budgets"],
+            "capabilities": state["capabilities"],
+            "actual_wall_time_seconds": round(max(0.0, time.time() - float(state["started_at_unix"])), 3),
+            "token_usage": state.get("token_usage"),
+        }, indent=2),
             encoding="utf-8",
         )
         if result.report:
@@ -558,6 +601,7 @@ class ExpertsRSSystem:
             "max_completion_tokens": request.provider.max_completion_tokens,
             "max_retries": request.provider.max_retries,
             "cache_enabled": request.provider.cache_enabled,
+            "provider_base_url_redacted": redacted_provider_base_url(request.provider),
             "api_calls_permitted": True,
             **ExpertsRSSystem._provenance_manifest(),
         }
