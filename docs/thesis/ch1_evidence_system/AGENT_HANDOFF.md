@@ -3,7 +3,7 @@
 ## Current execution authority
 
 Read `PLAN.md` first.  It freezes the remaining work into
-W1--W5 task packets and distinguishes the current offline method baseline from
+WP1--WP5 task packets and distinguishes the current offline method baseline from
 the later live-model evidence gate.  A workhorse chat must take exactly one
 packet; it must not redesign the thesis claim, comparison conditions, or
 legacy/new-system boundary.
