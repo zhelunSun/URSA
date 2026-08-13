@@ -66,6 +66,13 @@ class UnifiedSystemTests(unittest.TestCase):
         self.assertNotIn(str(SCENE), result.report)
         self.assertNotIn(".tif", result.report)
 
+    def test_greenspace_recovery_completes_with_current_matplotlib(self):
+        system = ExpertsRSSystem(executor=LocalToolExecutor(inject_failures={"apply_threshold": 1}))
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run("Calculate green cover rate for Dongcheng", Path(directory), system=system)
+        self.assertEqual(result.status, RunStatus.COMPLETED)
+        self.assertIn("map", {artifact.artifact_type for artifact in result.artifacts})
+
     def test_recovery_reuses_ndvi_checkpoint_without_recomputing(self):
         system = ExpertsRSSystem(executor=LocalToolExecutor(inject_failures={"apply_threshold": 1}))
         with tempfile.TemporaryDirectory() as directory:

@@ -8,6 +8,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 try:
     from ExpertsRS import ExecutionMode, ExpertsRSSystem, ProviderConfig, RunBudgets, RunRequest, RunStatus
@@ -51,6 +52,18 @@ class ProviderTests(unittest.TestCase):
             if old is not None:
                 os.environ["WP2_MISSING_KEY"] = old
 
+    def test_missing_base_url_fails_before_provider_client_construction(self):
+        config = ProviderConfig(model="test-model", api_key_env="WP4_PRESENT_KEY", base_url_env="WP4_MISSING_URL")
+        os.environ["WP4_PRESENT_KEY"] = "secret-value"
+        old = os.environ.pop("WP4_MISSING_URL", None)
+        try:
+            with self.assertRaisesRegex(ProviderFailure, "WP4_MISSING_URL"):
+                create_autogen_live_provider(config)
+        finally:
+            os.environ.pop("WP4_PRESENT_KEY", None)
+            if old is not None:
+                os.environ["WP4_MISSING_URL"] = old
+
     def test_live_manifest_never_contains_the_provider_key(self):
         class SafeProvider:
             async def decide(self, role, state):
@@ -69,9 +82,54 @@ class ProviderTests(unittest.TestCase):
         self.assertNotIn("WP2_KEY", run_text)
         self.assertNotIn("secret-value", run_text)
 
+    def test_model_views_and_manifest_exclude_paths_metadata_keys_and_fixture_labels(self):
+        from ExpertsRS.decisions import ScriptedDecisionProvider
+
+        class CapturingProvider:
+            def __init__(self):
+                self.delegate = ScriptedDecisionProvider()
+                self.views = []
+
+            async def decide(self, role, state):
+                self.views.append(json.loads(json.dumps(state)))
+                return await self.delegate.decide(role, state)
+
+        provider = CapturingProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result = asyncio.run(ExpertsRSSystem(provider=provider).run(RunRequest(
+                request="Map NDVI", data_paths=[SCENE], output_dir=root, run_id="redacted",
+            )))
+            manifest = json.loads((root / "redacted" / "manifest.json").read_text(encoding="utf-8"))
+        serialized_views = json.dumps(provider.views)
+        self.assertEqual(result.status, RunStatus.COMPLETED)
+        self.assertNotIn(str(SCENE), serialized_views)
+        self.assertNotIn("output_path", serialized_views)
+        self.assertNotIn("fixture", serialized_views)
+        self.assertIn("artifact_id", serialized_views)
+        self.assertTrue(manifest["provider"]["code_commit"])
+        self.assertTrue(manifest["provider"]["prompt_hash"])
+        self.assertTrue(manifest["provider"]["panel_hash"])
+
     def test_provider_timeout_and_api_error_have_distinct_sanitized_codes(self):
         self.assertEqual(classify_provider_exception(TimeoutError()).code, "provider_timeout")
         self.assertEqual(classify_provider_exception(ConnectionError()).code, "provider_api_error")
+        self.assertEqual(classify_provider_exception(ValueError()).code, "provider_response_error")
+
+    def test_provider_construction_is_no_network_and_initialization_failure_is_sanitized(self):
+        config = ProviderConfig(model="test-model", api_key_env="WP4_KEY", base_url_env="WP4_URL")
+        os.environ["WP4_KEY"] = "secret-value"
+        os.environ["WP4_URL"] = "https://example.invalid/v1"
+        try:
+            provider = create_autogen_live_provider(config)
+            self.assertIn("Manager", provider.agents)
+            with patch("autogen_ext.models.openai.OpenAIChatCompletionClient", side_effect=RuntimeError("secret-value")):
+                with self.assertRaisesRegex(ProviderFailure, "RuntimeError") as captured:
+                    create_autogen_live_provider(config)
+            self.assertNotIn("secret-value", str(captured.exception))
+        finally:
+            os.environ.pop("WP4_KEY", None)
+            os.environ.pop("WP4_URL", None)
 
     def test_provider_failure_preserves_partial_trace_without_fallback(self):
         class TimeoutProvider:

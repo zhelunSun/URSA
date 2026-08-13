@@ -216,7 +216,10 @@ def plot_thematic_map(file_path: str, class_labels: dict = None,
 
         # Create discrete colormap
         n = len(classes)
-        cmap = plt.cm.get_cmap("Set1", n) if n <= 9 else plt.cm.get_cmap("tab20", n)
+        # ``plt.cm.get_cmap`` was removed in Matplotlib 3.11.  The registry
+        # lookup keeps the same named discrete palettes and class count.
+        cmap_name = "Set1" if n <= 9 else "tab20"
+        cmap = plt.colormaps.get_cmap(cmap_name).resampled(n)
 
         if bounds:
             extent = [bounds["left"], bounds["right"], bounds["bottom"], bounds["top"]]
