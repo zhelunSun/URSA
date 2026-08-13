@@ -10,13 +10,13 @@ import unittest
 from pathlib import Path
 
 try:
-    from ExpertsRS import ExecutionMode, ExpertsRSSystem, ProviderConfig, RunRequest
-    from ExpertsRS.provider import ProviderFailure, create_autogen_live_provider
+    from ExpertsRS import ExecutionMode, ExpertsRSSystem, ProviderConfig, RunBudgets, RunRequest, RunStatus
+    from ExpertsRS.provider import ProviderFailure, classify_provider_exception, create_autogen_live_provider
 except ModuleNotFoundError:  # Support discovery from ExpertsRS/.
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from ExpertsRS import ExecutionMode, ExpertsRSSystem, ProviderConfig, RunRequest
-    from ExpertsRS.provider import ProviderFailure, create_autogen_live_provider
+    from ExpertsRS import ExecutionMode, ExpertsRSSystem, ProviderConfig, RunBudgets, RunRequest, RunStatus
+    from ExpertsRS.provider import ProviderFailure, classify_provider_exception, create_autogen_live_provider
 
 
 SCENE = Path(__file__).parent / "data" / "Sentinel2_Dongcheng_20230718.tif"
@@ -68,6 +68,45 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(result.provider, "openai-compatible")
         self.assertNotIn("WP2_KEY", run_text)
         self.assertNotIn("secret-value", run_text)
+
+    def test_provider_timeout_and_api_error_have_distinct_sanitized_codes(self):
+        self.assertEqual(classify_provider_exception(TimeoutError()).code, "provider_timeout")
+        self.assertEqual(classify_provider_exception(ConnectionError()).code, "provider_api_error")
+
+    def test_provider_failure_preserves_partial_trace_without_fallback(self):
+        class TimeoutProvider:
+            async def decide(self, role, state):
+                raise ProviderFailure("provider_timeout", "The provider request timed out.")
+
+        config = ProviderConfig(model="test-model", api_key_env="WP4_KEY", base_url_env="WP4_URL")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result = asyncio.run(ExpertsRSSystem(provider=TimeoutProvider()).run(RunRequest(
+                request="Map NDVI", data_paths=[SCENE], output_dir=root, run_id="timeout",
+                execution_mode=ExecutionMode.AUTOGEN_LIVE, provider=config,
+            )))
+            trace = result.trace_path.read_text(encoding="utf-8")
+        self.assertEqual(result.status, RunStatus.FAILED)
+        self.assertEqual(result.validation.tool_calls, 0)
+        self.assertIn("provider_timeout", trace)
+
+    def test_global_and_role_budgets_stop_with_explicit_terminal_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            global_stop = asyncio.run(ExpertsRSSystem().run(RunRequest(
+                request="Map NDVI", data_paths=[SCENE], output_dir=root, run_id="global",
+                budgets=RunBudgets(max_model_turns=2),
+            )))
+            role_stop = asyncio.run(ExpertsRSSystem().run(RunRequest(
+                request="Map NDVI", data_paths=[SCENE], output_dir=root, run_id="role",
+                budgets=RunBudgets(max_model_turns=12, max_tool_calls_engineer=0),
+            )))
+            global_trace = global_stop.trace_path.read_text(encoding="utf-8")
+            role_trace = role_stop.trace_path.read_text(encoding="utf-8")
+        self.assertEqual(global_stop.status, RunStatus.CONTROLLED_STOP)
+        self.assertIn("model_turn_budget_exhausted", global_trace)
+        self.assertEqual(role_stop.status, RunStatus.CONTROLLED_STOP)
+        self.assertIn("engineer_tool_budget_exhausted", role_trace)
 
 
 if __name__ == "__main__":

@@ -29,6 +29,8 @@ results/
 # Local test scratch space
 .test_tmp/
 tmp*/
+.coverage
+*.egg-info/
 
 # Local agent notes (private, not for public GitHub)
 .agent/

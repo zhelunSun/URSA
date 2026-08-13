@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+import hashlib
+import subprocess
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,6 +37,10 @@ from .workflow import (
     WorkflowTrace,
     build_process_graph,
 )
+
+
+class BudgetExhausted(RuntimeError):
+    """A normal, auditable terminal condition rather than an unclassified crash."""
 
 
 @dataclass
@@ -87,6 +93,7 @@ class ExpertsRSSystem:
         allowed_data_roots: list[str | Path] | None = None,
     ) -> None:
         self.provider = provider
+        self._provider_is_injected = provider is not None
         self.executor = executor or LocalToolExecutor()
         self.allowed_data_roots = tuple(Path(path).resolve() for path in (allowed_data_roots or []))
 
@@ -105,7 +112,7 @@ class ExpertsRSSystem:
     }
 
     async def run(self, request: RunRequest) -> RunResult:
-        if self.provider is None:
+        if not self._provider_is_injected:
             self.provider = self._provider_for_request(request)
         run_id = request.run_id or f"run_{uuid.uuid4().hex[:12]}"
         run_dir = self._new_run_dir(request.output_dir, run_id)
@@ -161,6 +168,7 @@ class ExpertsRSSystem:
             "checkpoint_id": None,
             "tool_calls": 0,
             "model_turns": 0,
+            "role_tool_calls": {"Scientist": 0, "Engineer": 0},
             "messages": [],
         }
 
@@ -205,6 +213,8 @@ class ExpertsRSSystem:
                         return self._stop(state, observation["message"], actor="Runtime")
                     if not state["capabilities"]["allow_plan_revision"]:
                         return self._stop(state, observation["message"], actor="Runtime")
+        except BudgetExhausted as error:
+            return self._stop(state, str(error), actor="Runtime")
         except ProviderFailure as error:
             state["status"] = RunStatus.FAILED
             self._append_trace(
@@ -219,7 +229,7 @@ class ExpertsRSSystem:
     async def _decide(self, state: dict[str, Any], role: str) -> dict[str, Any]:
         budgets = state["budgets"]
         if state["model_turns"] >= budgets["max_model_turns"]:
-            raise RuntimeError("model_turn_budget_exhausted")
+            raise BudgetExhausted("model_turn_budget_exhausted")
         state["model_turns"] += 1
         view = {
             "request": state["request"],
@@ -285,6 +295,9 @@ class ExpertsRSSystem:
             return {"tool": tool_name, "success": False, "message": "Tool is not in the runtime-visible catalog.", "error_code": "tool_not_registered"}
         if state["tool_calls"] >= state["budgets"]["max_tool_calls"]:
             return {"tool": tool_name, "success": False, "message": "tool_call_budget_exhausted", "error_code": "budget_exhausted"}
+        role_calls = state.setdefault("role_tool_calls", {"Scientist": 0, "Engineer": 0})
+        if role_calls["Engineer"] >= state["budgets"]["max_tool_calls_engineer"]:
+            return {"tool": tool_name, "success": False, "message": "engineer_tool_budget_exhausted", "error_code": "budget_exhausted"}
         arguments, contract_error = self._tool_arguments(state, binding, decision["artifact_refs"], decision["parameters"])
         if contract_error:
             return {"tool": tool_name, "success": False, "message": contract_error, "error_code": "unsafe_action_contract"}
@@ -302,6 +315,7 @@ class ExpertsRSSystem:
             return {"tool": tool_name, "success": False, "message": permission.reason, "error_code": "permission_denied"}
         trace.record_action(action_id, "Engineer", tool_name, self._redact_arguments(arguments), state["active_plan_id"], permission.decision_id)
         state["tool_calls"] += 1
+        role_calls["Engineer"] += 1
         result = self.executor.execute(tool_name, arguments, Path(state["run_dir"]) / "artifacts" / action_id.replace(":", "_"))
         if isinstance(result.get("fixture_id"), str):
             # Evaluation provenance is trace-only.  It is never placed in the
@@ -530,7 +544,10 @@ class ExpertsRSSystem:
     @staticmethod
     def _provider_manifest(request: RunRequest) -> dict[str, Any]:
         if request.execution_mode == ExecutionMode.SCRIPTED_OFFLINE:
-            return {"provider": "scripted", "model": "deterministic", "api_calls_permitted": False}
+            return {
+                "provider": "scripted", "model": "deterministic", "api_calls_permitted": False,
+                **ExpertsRSSystem._provenance_manifest(),
+            }
         assert request.provider is not None
         return {
             "provider": request.provider.provider,
@@ -539,7 +556,23 @@ class ExpertsRSSystem:
             "temperature": request.provider.temperature,
             "top_p": request.provider.top_p,
             "api_calls_permitted": True,
+            **ExpertsRSSystem._provenance_manifest(),
         }
+
+    @staticmethod
+    def _provenance_manifest() -> dict[str, str | None]:
+        root = Path(__file__).resolve().parent.parent
+        panel = root / "ExpertsRS" / "evaluation" / "ch1" / "d3_light_panel_v1.json"
+        prompt_source = Path(__file__).resolve().parent / "provider.py"
+        def digest(path: Path) -> str | None:
+            return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+        try:
+            code_commit = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=root, text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except (OSError, subprocess.CalledProcessError):
+            code_commit = None
+        return {"code_commit": code_commit, "prompt_hash": digest(prompt_source), "panel_hash": digest(panel)}
 
 
 def run_sync(system: ExpertsRSSystem, request: RunRequest) -> RunResult:

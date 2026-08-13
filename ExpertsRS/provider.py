@@ -17,6 +17,18 @@ class ProviderFailure(RuntimeError):
         self.code = code
 
 
+def classify_provider_exception(error: Exception) -> ProviderFailure:
+    """Convert transport/protocol failures to a stable, non-secret terminal cause."""
+    if isinstance(error, TimeoutError):
+        return ProviderFailure("provider_timeout", "The provider request timed out.")
+    name = type(error).__name__.lower()
+    if "timeout" in name:
+        return ProviderFailure("provider_timeout", "The provider request timed out.")
+    if "http" in name or "api" in name or "connection" in name:
+        return ProviderFailure("provider_api_error", f"Provider request failed: {type(error).__name__}.")
+    return ProviderFailure("provider_response_error", f"Provider response failed validation: {type(error).__name__}.")
+
+
 def create_autogen_live_provider(config: ProviderConfig) -> AutoGenSelectorDecisionProvider:
     """Construct exactly the requested provider or fail before any request.
 

@@ -208,11 +208,15 @@ class AutoGenSelectorDecisionProvider:
 
     async def decide(self, role: str, state: dict[str, Any]) -> dict[str, Any]:
         import json
+        from .provider import classify_provider_exception
 
         if role not in self.agents:
             raise ValueError(f"Unknown role: {role}")
         self._active_role["value"] = role
-        response = await self.team.run(task=json.dumps(state, ensure_ascii=False))
+        try:
+            response = await self.team.run(task=json.dumps(state, ensure_ascii=False))
+        except Exception as error:
+            raise classify_provider_exception(error) from error
         messages = getattr(response, "messages", [])
         role_messages = [message for message in messages if getattr(message, "source", None) == role.lower()]
         content = getattr(role_messages[-1], "content", None) if role_messages else None
