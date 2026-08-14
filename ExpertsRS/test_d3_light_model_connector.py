@@ -187,7 +187,7 @@ class D3LightModelConnectorTests(unittest.TestCase):
         base_url_env = selection["base_url_env"]
         old_model = os.environ.pop(model_env, None)
         old_base_url = os.environ.get(base_url_env)
-        os.environ[base_url_env] = "https://api.siliconflow.cn/v1"
+        os.environ[base_url_env] = "https://llmapi.paratera.com/v1"
         try:
             client = configured_deepseek_client(self.panel)
         finally:
@@ -197,7 +197,7 @@ class D3LightModelConnectorTests(unittest.TestCase):
                 os.environ.pop(base_url_env, None)
             else:
                 os.environ[base_url_env] = old_base_url
-        self.assertEqual(client.base_url, "https://api.siliconflow.cn/v1")
+        self.assertEqual(client.base_url, "https://llmapi.paratera.com/v1")
         for task_id, phase, expected_role in ((13, "initial", "Manager"), (2, "metadata", "Scientist"), (2, "recovery", "Engineer")):
             request = self.connector.build_request(
                 build_agent_case(self.panel, task_id, "B2_adaptive"), {"phase": phase}

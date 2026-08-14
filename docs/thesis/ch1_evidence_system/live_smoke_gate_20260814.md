@@ -2,8 +2,8 @@
 
 ## Decision
 
-Authorize exactly the fixed S1-S3 live smoke slots with SiliconFlow model
-`deepseek-ai/DeepSeek-V4-Flash`. This decision does not authorize the 15-case
+Authorize exactly the fixed S1-S3 live smoke slots with Paratera model
+`DeepSeek-V4-Flash`. This decision does not authorize the 15-case
 pilot or any 45-run repetition.
 
 ## Frozen configuration
@@ -18,11 +18,10 @@ pilot or any 45-run repetition.
 - failure policy: preserve the partial run and stop the batch; never replace a
   failed case or silently change provider/model.
 
-At the provider's 2026-08-14 displayed V4-Flash prices (CNY 1/M input tokens
-and CNY 2/M output tokens), the conservative 70,000-token ceiling implies at
-most CNY 0.14 per run if charged entirely at the higher output rate, or at most
-CNY 2.10 for 15 runs. Actual usage should be lower; provider billing is
-the authoritative cost record.
+The former SiliconFlow price estimate is not reused for Paratera. Paratera
+uses token-based billing, but its account-specific V4-Flash price must be read
+from the provider console. The 70,000-token ceiling remains the hard exposure
+limit; every run records provider usage metadata for the actual cost audit.
 
 The provider-call timeout remains 120 seconds. The longer run wall-time only
 accommodates the serial recovery chain and observed variable model latency; it
@@ -36,7 +35,7 @@ does not relax token, turn, tool-call or retry limits.
 - `compileall` and `git diff --check`: passed;
 - panel/source integrity, evaluator isolation, redaction, missing-key,
   timeout/API failure, budget and non-overwrite tests: passed;
-- provider probe: `/models` and a minimal V4-Flash chat completion returned
-  HTTP 200; no credential was written to tracked files.
+- Paratera provider probe: `/models` and a minimal V4-Flash chat completion
+  returned HTTP 200; no credential was written to tracked files.
 
 The untracked local environment flag remains the independent second gate.

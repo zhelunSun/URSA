@@ -209,12 +209,12 @@
   "proposed_run_protocol": {
     "status": "frozen_live_smoke_authorized",
     "model_selection": {
-      "provider": "SiliconFlow",
-      "provider_env": "SILICONFLOW_API_KEY",
-      "base_url_env": "SILICONFLOW_BASE_URL",
+      "provider": "Paratera",
+      "provider_env": "PARATERA_API_KEY",
+      "base_url_env": "PARATERA_BASE_URL",
       "model_env": "EXPERTSRS_D3_LIGHT_MODEL",
-      "default_model": "deepseek-ai/DeepSeek-V4-Flash",
-      "rationale": "Use one inexpensive tool-capable model for S1-S3 and all B1/B2/B3 pilot arms so mechanism effects are not confounded with a model change.",
+      "default_model": "DeepSeek-V4-Flash",
+      "rationale": "Use Paratera's available DeepSeek-V4-Flash for the reviewed S1-S3 rerun after SiliconFlow provider timeouts; retain one model for all B1/B2/B3 pilot arms so mechanism effects are not confounded with a model change.",
       "single_model_only": true
     },
     "sampling": {

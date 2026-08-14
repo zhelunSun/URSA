@@ -107,8 +107,8 @@ class Chapter1BenchmarkIntegrityTests(unittest.TestCase):
         self.assertIn("three fixed S1-S3 live smoke slots", gate["authorization_scope"])
         self.assertIn("15-case pilot remains separately gated", gate["authorization_scope"])
         selection = self.d3["proposed_run_protocol"]["model_selection"]
-        self.assertEqual(selection["provider"], "SiliconFlow")
-        self.assertEqual(selection["default_model"], "deepseek-ai/DeepSeek-V4-Flash")
+        self.assertEqual(selection["provider"], "Paratera")
+        self.assertEqual(selection["default_model"], "DeepSeek-V4-Flash")
 
     def test_d3_agent_view_does_not_leak_fixture_or_gold(self):
         agent_case = build_agent_case(self.d3, 11, "B3_checkpoint")
