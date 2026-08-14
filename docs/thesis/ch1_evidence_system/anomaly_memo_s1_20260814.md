@@ -60,3 +60,13 @@ limits, but the 300-second run wall-time expired after the recovered thematic
 map and before area/report completion. The per-provider-call timeout remains
 120 seconds; only the encompassing serial run wall-time is raised to 600
 seconds, without changing retry, token, turn or tool limits.
+
+At the final frozen attempt on commit `175a248`, S1 passed again. During S2,
+SiliconFlow exceeded the 120-second single-call timeout after metadata and the
+checkpointed NDVI artifact. Zero-retry policy preserved the provider failure
+and stopped the batch; S3 was not run. This is retained as provider-stability
+evidence, not silently replaced. The local API gate was closed after the run.
+
+Current L1 decision: **NO-GO** for the 15-case pilot. A later reviewed smoke
+window may rerun all three fixed slots in a new directory, but must retain and
+report these failed attempts.
