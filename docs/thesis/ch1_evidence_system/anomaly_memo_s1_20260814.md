@@ -70,3 +70,10 @@ evidence, not silently replaced. The local API gate was closed after the run.
 Current L1 decision: **NO-GO** for the 15-case pilot. A later reviewed smoke
 window may rerun all three fixed slots in a new directory, but must retain and
 report these failed attempts.
+
+The first Paratera smoke attempt at commit `f5cfe77` reached the model but
+failed before action because V4-Flash exhausted the 1,024 completion limit in
+hidden reasoning and returned no final JSON. A controlled 8,192-token probe
+ended normally with valid JSON (reasoning was not stored or displayed). The
+per-call completion ceiling is therefore raised to 8,192 while the outer
+70,000-token, 12-turn, 10-tool and zero-retry limits remain in force.

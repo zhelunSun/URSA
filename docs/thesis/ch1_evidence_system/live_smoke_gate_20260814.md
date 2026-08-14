@@ -10,7 +10,8 @@ pilot or any 45-run repetition.
 
 - sampling: temperature 0, top-p 1, cache disabled;
 - retries: zero model retries and zero tool retries;
-- per model call: at most 1,024 completion tokens;
+- per model call: at most 8,192 completion tokens; Paratera V4-Flash requires
+  this headroom to finish its hidden reasoning and return the required JSON;
 - per run: 12 model turns, 10 tool calls (Scientist 4, Engineer 8), 600 seconds,
   and 70,000 recorded total tokens;
 - first comparison, if separately authorized after smoke review: 15 single

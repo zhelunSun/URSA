@@ -67,7 +67,7 @@ class D3LightModelConnectorTests(unittest.TestCase):
         })
         self.assertIn("Scientist", request["messages"][0]["content"])
         self.assertEqual(request["settings"]["temperature"], 0)
-        self.assertEqual(request["settings"]["max_tokens"], 1024)
+        self.assertEqual(request["settings"]["max_tokens"], 8192)
 
     def test_request_redacts_paths_hashes_and_hidden_contracts(self):
         case = build_agent_case(self.panel, 11, "B3_checkpoint")

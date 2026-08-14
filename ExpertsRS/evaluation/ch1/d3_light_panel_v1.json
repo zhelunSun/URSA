@@ -231,7 +231,7 @@
       "max_tool_calls_scientist": 4,
       "max_tool_calls_engineer": 8,
       "max_wall_time_seconds": 600,
-      "max_completion_tokens": 1024,
+      "max_completion_tokens": 8192,
       "max_total_tokens_recorded": 70000,
       "max_retries_per_model_call": 0,
       "max_retries_per_tool_call": 0
