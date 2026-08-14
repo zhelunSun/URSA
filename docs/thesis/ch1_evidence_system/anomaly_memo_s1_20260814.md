@@ -16,3 +16,11 @@ The failed run is retained under
 `ExpertsRS/results/ch1_d3_light/authorized_smoke/`; it must not be overwritten
 or silently counted as a passing smoke. A rerun must use a new destination and
 a new committed code identity.
+
+The first remediation rerun at commit `15b5c66` also stopped at Manager
+clarification. It correctly recognized that an input existed, but asked the
+user for sensor/band and clipping details that the Scientist and metadata tool
+are responsible for discovering. That run is retained under
+`authorized_smoke_rerun_15b5c66/`. The second remediation narrows the Manager
+contract: clarification is limited to ambiguous analysis goals, metrics, or
+outputs; technical raster preconditions must be delegated to Scientist/tools.

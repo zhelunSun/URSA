@@ -87,6 +87,9 @@ def _role_instructions() -> dict[str, str]:
             '{"kind":"handoff","target":"Scientist"}, or, when phase is report, '
             '{"kind":"report","summary":"...","artifact_refs":["artifact-id"]}. '
             "If input_data_available is true, the local runtime already has the input; do not ask for a file path or upload. "
+            "Clarify only when the requested analysis goal, metric, or output is semantically ambiguous. "
+            "Do not ask for sensor, bands, raster metadata, spatial coverage, or file format when input data is available; "
+            "the Scientist and registered tools must inspect those technical preconditions. "
             "Do not include paths, data values, or prose outside JSON."
         ),
         "Scientist": (
