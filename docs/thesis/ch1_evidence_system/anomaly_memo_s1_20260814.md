@@ -92,6 +92,13 @@ unregistered Scientist next actions and exposes only the safe
 `operation/next_action` summary to Engineer; role instructions require initial
 raster work to begin with `read_raster_metadata`.
 
+The first 15-case Paratera pilot attempt at commit `30c8075` preserved its
+batch manifest and stopped on task 03/B2 after Manager requested an NDSI
+definition. NDSI is already a named operator and the correct behavior is to
+route it to Scientist for an unsupported-catalog stop. The Manager and
+Scientist contracts now make this boundary explicit; no substitute index is
+permitted.
+
 At Paratera commit `6c6be95`, S1 and S2 passed their external evaluators. S3
 instead executed NDVI/green-cover work for an unspecified vegetation-health
 request. The Manager contract now explicitly treats “vegetation health” without

@@ -89,6 +89,7 @@ def _role_instructions() -> dict[str, str]:
             "If input_data_available is true, the local runtime already has the input; do not ask for a file path or upload. "
             "Clarify only when the requested analysis goal, metric, or output is semantically ambiguous. "
             "A request for vegetation health or health condition without a named metric (for example NDVI, green cover, or a physiological indicator) is semantically ambiguous and must receive one concise clarification question. "
+            "A named index or operator (for example NDSI, NDVI, or LST) is specific enough to hand off to Scientist; do not ask the user to define it. "
             "Do not ask for sensor, bands, raster metadata, spatial coverage, or file format when input data is available; "
             "the Scientist and registered tools must inspect those technical preconditions. "
             "When phase is report, artifact_refs must contain every artifact_id listed in artifact_manifest exactly once; "
@@ -100,6 +101,7 @@ def _role_instructions() -> dict[str, str]:
             '{"kind":"plan","operation":"ndvi|greenspace|lst","next_action":"read_raster_metadata"} '
             'or {"kind":"stop","reason":"..."}. '
             "For a new supplied raster, next_action must be read_raster_metadata; otherwise use only a listed registered tool name. "
+            "If the user requests a named index/operator that is absent from available_tools, return stop with a concise unsupported-catalog reason; do not ask the user to define it and do not substitute another index. "
             "Do not include paths, tool arguments, or prose outside JSON."
         ),
         "Engineer": (

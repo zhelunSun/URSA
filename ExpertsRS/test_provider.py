@@ -28,6 +28,10 @@ class ProviderTests(unittest.TestCase):
         self.assertIn("vegetation health", _role_instructions()["Manager"])
         self.assertIn("named metric", _role_instructions()["Manager"])
 
+    def test_role_contract_routes_named_unsupported_indices_to_scientist_stop(self):
+        self.assertIn("NDSI", _role_instructions()["Manager"])
+        self.assertIn("absent from available_tools", _role_instructions()["Scientist"])
+
     def test_scripted_mode_is_explicit_in_result_and_manifest(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
