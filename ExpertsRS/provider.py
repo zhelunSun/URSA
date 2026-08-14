@@ -90,6 +90,8 @@ def _role_instructions() -> dict[str, str]:
             "Clarify only when the requested analysis goal, metric, or output is semantically ambiguous. "
             "Do not ask for sensor, bands, raster metadata, spatial coverage, or file format when input data is available; "
             "the Scientist and registered tools must inspect those technical preconditions. "
+            "When phase is report, artifact_refs must contain every artifact_id listed in artifact_manifest exactly once; "
+            "do not omit a validated artifact and do not invent an ID. "
             "Do not include paths, data values, or prose outside JSON."
         ),
         "Scientist": (

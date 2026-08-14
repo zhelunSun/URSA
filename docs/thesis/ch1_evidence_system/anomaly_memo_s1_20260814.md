@@ -24,3 +24,10 @@ are responsible for discovering. That run is retained under
 `authorized_smoke_rerun_15b5c66/`. The second remediation narrows the Manager
 contract: clarification is limited to ambiguous analysis goals, metrics, or
 outputs; technical raster preconditions must be delegated to Scientist/tools.
+
+At commit `47a0d3f`, S1 passed Manager routing and completed metadata, NDVI and
+map production, but the final report referenced only the map instead of the
+complete validated artifact manifest. Runtime correctly returned
+`report_failed`; the run is retained under `authorized_smoke_rerun_47a0d3f/`.
+The report prompt is therefore aligned with the already-enforced WP3 contract:
+reference every supplied validated artifact ID exactly once and invent none.
