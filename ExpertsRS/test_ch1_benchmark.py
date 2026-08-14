@@ -104,6 +104,7 @@ class Chapter1BenchmarkIntegrityTests(unittest.TestCase):
     def test_d3_api_gate_authorizes_only_the_three_reviewed_smokes(self):
         gate = self.d3["run_gate"]
         self.assertTrue(gate["api_calls_authorized"])
+        self.assertTrue(gate["pilot_authorized"])
         self.assertIn("three fixed S1-S3 live smoke slots", gate["authorization_scope"])
         self.assertIn("15-case pilot remains separately gated", gate["authorization_scope"])
         selection = self.d3["proposed_run_protocol"]["model_selection"]

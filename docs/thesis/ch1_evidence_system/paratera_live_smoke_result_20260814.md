@@ -16,8 +16,8 @@ these passing results.
 
 ## L1 status
 
-The technical S1-S3 gate is passed. The 15-case matched pilot is **not**
-auto-started: first inspect this run package for provenance, rendered artifacts,
-trace reconstructability, cost records and any disclosure anomaly. If that
-review passes, freeze this commit and run the 15 cases once in the prescribed
-balanced order.
+The technical S1-S3 gate and run-package review are passed. On 2026-08-14 the
+researcher authorized exactly one 15-case matched pilot using the same Paratera
+model, frozen budgets and seeded balanced order. The new pilot runner writes a
+batch manifest before its first API call and a token/time summary after all 15
+external evaluations pass; any failure preserves the partial batch and stops.

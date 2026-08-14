@@ -196,6 +196,8 @@
   ],
   "run_gate": {
     "api_calls_authorized": true,
+    "pilot_authorized": true,
+    "pilot_authorized_on": "2026-08-14",
     "authorization_scope": "Exactly the three fixed S1-S3 live smoke slots; the 15-case pilot remains separately gated.",
     "authorized_on": "2026-08-14",
     "required_before_api": [

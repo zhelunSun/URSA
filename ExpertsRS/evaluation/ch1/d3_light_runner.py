@@ -10,6 +10,9 @@ replace it with this runner's ``next_step`` interface.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import hashlib
+import json
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -587,6 +590,82 @@ async def run_authorized_d3_smoke(
         results.append(record)
         if not evaluation["passed"]:
             raise RuntimeError(f"D3 live smoke evaluator failed: {slot.case_id}: {evaluation}")
+    return results
+
+
+async def run_authorized_d3_pilot(
+    destination: str | Path,
+    provider_config: Any,
+    *,
+    panel: dict[str, Any] | None = None,
+    system_factory: Any | None = None,
+) -> list[dict[str, Any]]:
+    """Run the reviewed 5-task × 3-condition pilot once in balanced order.
+
+    This is deliberately a separate authorization from the three-smoke gate.
+    A batch manifest is written before the first provider request; the existing
+    per-case records preserve any partial batch if a case fails.
+    """
+    panel = panel or load_panel()
+    if not bool(panel["run_gate"].get("pilot_authorized")):
+        raise RuntimeError("D3 live pilot requires the separately reviewed pilot_authorized panel gate")
+    if not api_calls_permitted(panel):
+        raise RuntimeError("D3 live pilot requires both the reviewed panel gate and EXPERTSRS_D3_LIGHT_ALLOW_API=YES")
+    root = Path(destination)
+    if root.exists():
+        raise FileExistsError(f"Refusing to overwrite existing D3 live pilot directory: {root}")
+    root.mkdir(parents=True)
+    selected = balanced_case_order(build_case_slots(panel))
+    panel_path = Path(__file__).with_name("d3_light_panel_v1.json")
+    batch_manifest = {
+        "kind": "ch1_d3_live_pilot",
+        "started_at_utc": datetime.now(timezone.utc).isoformat(),
+        "execution_mode": "autogen-live",
+        "provider": {
+            "provider": provider_config.provider,
+            "model": provider_config.model,
+            "api_key_env": provider_config.api_key_env,
+            "base_url_env": provider_config.base_url_env,
+            "timeout_seconds": provider_config.timeout_seconds,
+            "temperature": provider_config.temperature,
+            "top_p": provider_config.top_p,
+            "max_completion_tokens": provider_config.max_completion_tokens,
+            "max_retries": provider_config.max_retries,
+            "cache_enabled": provider_config.cache_enabled,
+        },
+        "panel_sha256": hashlib.sha256(panel_path.read_bytes()).hexdigest(),
+        "scheduled_order": [slot.case_id for slot in selected],
+        "planned_case_count": len(selected),
+        "overwrite_policy": "never_overwrite",
+    }
+    (root / "pilot_batch_manifest.json").write_text(json.dumps(batch_manifest, indent=2), encoding="utf-8")
+    results = await run_authorized_d3_smoke(
+        root, provider_config, slots=selected, panel=panel, system_factory=system_factory,
+    )
+    cases: list[dict[str, Any]] = []
+    totals = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "wall_time_seconds": 0.0}
+    for record in results:
+        run_dir = Path(record["result"]["trace_path"]).parent
+        manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+        usage = manifest.get("token_usage", {})
+        for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+            totals[key] += int(usage.get(key, 0))
+        totals["wall_time_seconds"] += float(manifest.get("actual_wall_time_seconds", 0.0))
+        cases.append({
+            "case_id": record["case_id"],
+            "passed": bool(record["evaluation"]["passed"]),
+            "status": record["result"]["status"],
+            "usage": usage,
+            "wall_time_seconds": manifest.get("actual_wall_time_seconds"),
+        })
+    (root / "pilot_summary.json").write_text(json.dumps({
+        **batch_manifest,
+        "completed_at_utc": datetime.now(timezone.utc).isoformat(),
+        "completed_case_count": len(results),
+        "all_evaluations_passed": all(item["passed"] for item in cases),
+        "aggregate_usage": totals,
+        "cases": cases,
+    }, indent=2), encoding="utf-8")
     return results
 
 

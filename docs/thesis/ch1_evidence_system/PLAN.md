@@ -205,8 +205,9 @@ WP4b 不得在 E1 运行中修改被冻结的实验 commit。若 E1 已开始，
 > 2026-08-14 阶段结果：S1 已在冻结 live 路径通过；S2 的恢复合同、预算与时限缺口已通过保留失败
 > 运行逐项暴露并修复，但最终冻结轮遇到 SiliconFlow 单次请求超时；S3 未运行。本地 API gate 已重新
 > 关闭，L1（15-case pilot）判定为 NO-GO。随后已明确审查 Paratera 的 `DeepSeek-V4-Flash` 可用性，
-> 并在 commit `a4006dc` 从头完成 S1-S3（均 PASS）。L1 现在进入运行包人工审查，审查通过前不得
-> 自动开始 15-case pilot；此前 SiliconFlow 结果仍作为保留的 provider-stability anomaly。
+> 并在 commit `a4006dc` 从头完成 S1-S3（均 PASS）。运行包审查完成后，研究者已授权一轮 15-case
+> pilot；它使用单独的 `pilot_authorized` panel gate、Paratera 的同一模型和不可覆盖的批次汇总。此前
+> SiliconFlow 结果仍作为保留的 provider-stability anomaly。
 
 | Smoke | 场景 | 必须观察到 |
 | --- | --- | --- |

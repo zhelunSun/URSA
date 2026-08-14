@@ -17,7 +17,8 @@ from evaluation.ch1.d3_light_protocol import (
     write_dry_run_manifests,
 )
 from evaluation.ch1.d3_light_runner import (
-    D3LightRunner, DeterministicDryRunProvider, run_authorized_d3_smoke, run_unified_d3_case,
+    D3LightRunner, DeterministicDryRunProvider, run_authorized_d3_pilot,
+    run_authorized_d3_smoke, run_unified_d3_case,
 )
 from evaluation.ch1.d3_light_tool_executor import D3LightToolExecutor
 from evaluation.ch1 import run_d3_light_model_smoke
@@ -132,6 +133,21 @@ class D3LightDryRunTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(RuntimeError, "requires both"):
                 asyncio.run(run_authorized_d3_smoke(Path(directory), object(), slots=[slot]))
+
+    def test_live_pilot_requires_its_separate_panel_authorization(self):
+        panel = deepcopy(self.panel)
+        panel["run_gate"]["pilot_authorized"] = False
+        old_gate = __import__("os").environ.get(API_GATE_ENV)
+        __import__("os").environ[API_GATE_ENV] = "YES"
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(RuntimeError, "pilot_authorized"):
+                    asyncio.run(run_authorized_d3_pilot(Path(directory) / "pilot", object(), panel=panel))
+        finally:
+            if old_gate is None:
+                __import__("os").environ.pop(API_GATE_ENV, None)
+            else:
+                __import__("os").environ[API_GATE_ENV] = old_gate
 
     def test_opened_smoke_gate_uses_unified_live_runtime_without_network(self):
         from ExpertsRS import ExecutionMode, ExpertsRSSystem, ProviderConfig

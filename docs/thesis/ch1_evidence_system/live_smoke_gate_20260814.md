@@ -30,7 +30,7 @@ does not relax token, turn, tool-call or retry limits.
 
 ## L0 verification
 
-- complete suite after live-smoke remediation: 104 tests passed;
+- complete suite after live-smoke remediation: 105 tests passed;
 - clean virtual environment: 101 unittest cases passed;
 - control-plane/evaluator coverage: 90% branch-aware coverage (threshold 85%);
 - `compileall` and `git diff --check`: passed;
