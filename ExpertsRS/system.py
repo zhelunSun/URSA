@@ -166,6 +166,7 @@ class ExpertsRSSystem:
             "artifacts": [],
             "trace": trace.to_dict(),
             "active_plan_id": None,
+            "current_plan": None,
             "plan_count": 0,
             "checkpoint_id": None,
             "tool_calls": 0,
@@ -202,6 +203,8 @@ class ExpertsRSSystem:
                 return self._stop(state, scientist["reason"], actor="Scientist")
             if scientist["kind"] != "plan":
                 return self._stop(state, "Scientist did not produce a safe plan.", actor="Runtime")
+            if scientist["next_action"] not in self.TOOL_BINDINGS:
+                return self._stop(state, "Scientist proposed an unregistered next action.", actor="Runtime")
 
             self._create_plan(state, scientist["operation"], scientist["next_action"])
             state["phase"] = "execution"
@@ -261,6 +264,7 @@ class ExpertsRSSystem:
             "available_tools": [binding.model_dump(mode="json") for binding in self.TOOL_BINDINGS.values()],
             "observations": [self._redact_observation(item) for item in state["observations"]],
             "artifact_manifest": [self._model_artifact_record(item) for item in state["artifacts"]],
+            "current_plan": state.get("current_plan"),
             "remaining_tool_budget": budgets["max_tool_calls"] - state["tool_calls"],
         }
         raw_decision = await self.provider.decide(role, view)
@@ -317,6 +321,7 @@ class ExpertsRSSystem:
             f"{state['run_id']}:plan", 1, state["request"], operation, next_action, owner="Scientist"
         )
         state["active_plan_id"] = plan.object_id
+        state["current_plan"] = {"operation": operation, "next_action": next_action}
         state["plan_count"] = 1
         self._trace(state).record_plan_version(plan)
         self._sync_trace(state)
@@ -332,6 +337,7 @@ class ExpertsRSSystem:
             trigger_event_id=trigger, restart_from_checkpoint_id=checkpoint_id,
         )
         state["active_plan_id"] = plan.object_id
+        state["current_plan"] = {"operation": "recovery", "next_action": next_action}
         state["plan_count"] = version
         self._trace(state).record_plan_version(plan)
         self._sync_trace(state)

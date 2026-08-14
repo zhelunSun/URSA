@@ -124,6 +124,20 @@ class UnifiedSystemTests(unittest.TestCase):
         self.assertEqual(result.status, RunStatus.CONTROLLED_STOP)
         self.assertEqual(actions.count("apply_threshold"), 1)
 
+    def test_unregistered_scientist_next_action_stops_before_tool_execution(self):
+        class InvalidScientistPlanProvider:
+            async def decide(self, role, state):
+                if role == "Manager":
+                    return {"kind": "handoff", "target": "Scientist"}
+                if role == "Scientist":
+                    return {"kind": "plan", "operation": "ndvi", "next_action": "not_a_registered_tool"}
+                raise AssertionError("Engineer must not be called for an invalid Scientist plan")
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run("Map NDVI", Path(directory), system=ExpertsRSSystem(provider=InvalidScientistPlanProvider()))
+        self.assertEqual(result.status, RunStatus.CONTROLLED_STOP)
+        self.assertEqual(result.validation.tool_calls, 0)
+
     def test_unsupported_and_scientifically_invalid_requests_stop(self):
         with tempfile.TemporaryDirectory() as directory:
             ndsi = self._run("Map NDSI for Dongcheng", Path(directory) / "ndsi")

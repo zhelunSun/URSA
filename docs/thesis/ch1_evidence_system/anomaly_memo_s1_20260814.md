@@ -84,3 +84,10 @@ threshold action with an unapproved parameter instead of handing off for the
 report; runtime rejected it without executing the unsafe action. The Engineer
 contract now explicitly forbids repeating successful tools and requires a
 Manager handoff when the requested artifacts are present.
+
+At Paratera commit `9b7979d`, S1 completed but skipped metadata. Scientist had
+returned the literal placeholder `registered_tool` as its plan next action,
+and that plan was not previously shown to Engineer. The runtime now rejects
+unregistered Scientist next actions and exposes only the safe
+`operation/next_action` summary to Engineer; role instructions require initial
+raster work to begin with `read_raster_metadata`.
