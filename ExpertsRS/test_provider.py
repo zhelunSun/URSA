@@ -12,18 +12,22 @@ from unittest.mock import patch
 
 try:
     from ExpertsRS import ExecutionMode, ExpertsRSSystem, ProviderConfig, RunBudgets, RunRequest, RunStatus
-    from ExpertsRS.provider import ProviderFailure, classify_provider_exception, create_autogen_live_provider
+    from ExpertsRS.provider import ProviderFailure, _role_instructions, classify_provider_exception, create_autogen_live_provider
 except ModuleNotFoundError:  # Support discovery from ExpertsRS/.
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from ExpertsRS import ExecutionMode, ExpertsRSSystem, ProviderConfig, RunBudgets, RunRequest, RunStatus
-    from ExpertsRS.provider import ProviderFailure, classify_provider_exception, create_autogen_live_provider
+    from ExpertsRS.provider import ProviderFailure, _role_instructions, classify_provider_exception, create_autogen_live_provider
 
 
 SCENE = Path(__file__).parent / "data" / "Sentinel2_Dongcheng_20230718.tif"
 
 
 class ProviderTests(unittest.TestCase):
+    def test_manager_contract_requires_metric_for_vegetation_health(self):
+        self.assertIn("vegetation health", _role_instructions()["Manager"])
+        self.assertIn("named metric", _role_instructions()["Manager"])
+
     def test_scripted_mode_is_explicit_in_result_and_manifest(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

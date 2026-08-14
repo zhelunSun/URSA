@@ -88,6 +88,7 @@ def _role_instructions() -> dict[str, str]:
             '{"kind":"report","summary":"...","artifact_refs":["artifact-id"]}. '
             "If input_data_available is true, the local runtime already has the input; do not ask for a file path or upload. "
             "Clarify only when the requested analysis goal, metric, or output is semantically ambiguous. "
+            "A request for vegetation health or health condition without a named metric (for example NDVI, green cover, or a physiological indicator) is semantically ambiguous and must receive one concise clarification question. "
             "Do not ask for sensor, bands, raster metadata, spatial coverage, or file format when input data is available; "
             "the Scientist and registered tools must inspect those technical preconditions. "
             "When phase is report, artifact_refs must contain every artifact_id listed in artifact_manifest exactly once; "

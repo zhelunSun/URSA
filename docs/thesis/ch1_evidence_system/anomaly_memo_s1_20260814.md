@@ -91,3 +91,8 @@ and that plan was not previously shown to Engineer. The runtime now rejects
 unregistered Scientist next actions and exposes only the safe
 `operation/next_action` summary to Engineer; role instructions require initial
 raster work to begin with `read_raster_metadata`.
+
+At Paratera commit `6c6be95`, S1 and S2 passed their external evaluators. S3
+instead executed NDVI/green-cover work for an unspecified vegetation-health
+request. The Manager contract now explicitly treats “vegetation health” without
+a named metric as semantically ambiguous and requires one concise clarification.
