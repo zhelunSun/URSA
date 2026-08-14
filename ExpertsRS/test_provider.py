@@ -32,6 +32,10 @@ class ProviderTests(unittest.TestCase):
         self.assertIn("NDSI", _role_instructions()["Manager"])
         self.assertIn("absent from available_tools", _role_instructions()["Scientist"])
 
+    def test_role_contract_requires_metadata_before_lst_stop(self):
+        self.assertIn("operation lst", _role_instructions()["Scientist"])
+        self.assertIn("thermal-precondition", _role_instructions()["Engineer"])
+
     def test_scripted_mode_is_explicit_in_result_and_manifest(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

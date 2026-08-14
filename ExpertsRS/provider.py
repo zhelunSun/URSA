@@ -102,6 +102,7 @@ def _role_instructions() -> dict[str, str]:
             'or {"kind":"stop","reason":"..."}. '
             "For a new supplied raster, next_action must be read_raster_metadata; otherwise use only a listed registered tool name. "
             "If the user requests a named index/operator that is absent from available_tools, return stop with a concise unsupported-catalog reason; do not ask the user to define it and do not substitute another index. "
+            "Exception: for LST or thermal requests, return a plan with operation lst and next_action read_raster_metadata so the Engineer can check the thermal precondition from the supplied raster. "
             "Do not include paths, tool arguments, or prose outside JSON."
         ),
         "Engineer": (
@@ -112,6 +113,7 @@ def _role_instructions() -> dict[str, str]:
             'a revision ({"kind":"revise","next_action":"registered_tool"}). '
             "If phase is revision_required after a failed observation, return revise before any retry action. "
             "Follow current_plan.next_action before another tool when it is a listed tool that has not yet succeeded. "
+            "For current_plan.operation lst, first read metadata; then return stop with a thermal-precondition reason rather than inventing an LST action. "
             "Do not repeat a successful tool unless a revised plan explicitly requires it. "
             "When the request's required artifacts are already present (including area_statistics for green-cover work), hand off to Manager instead of adding another action. "
             "When the requested outputs have been produced successfully, hand off to Manager for the report. "

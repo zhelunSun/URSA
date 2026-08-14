@@ -99,6 +99,12 @@ route it to Scientist for an unsupported-catalog stop. The Manager and
 Scientist contracts now make this boundary explicit; no substitute index is
 permitted.
 
+At Paratera pilot commit `b5d2b5c`, task 10/B1 stopped correctly but too early:
+Scientist treated LST as merely absent from the catalog and skipped metadata.
+LST is a deliberate data-precondition case, so the role contract now requires
+`lst → read_raster_metadata → thermal-precondition stop`, without any LST
+artifact or invented thermal-band action.
+
 At Paratera commit `6c6be95`, S1 and S2 passed their external evaluators. S3
 instead executed NDVI/green-cover work for an unspecified vegetation-health
 request. The Manager contract now explicitly treats “vegetation health” without
