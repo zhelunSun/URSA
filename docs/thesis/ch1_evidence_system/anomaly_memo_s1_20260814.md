@@ -54,3 +54,9 @@ the normal greenspace chain consumes six calls and the injected failure adds a
 seventh. The reviewed cap is corrected to 8 Engineer calls within the existing
 10-call global limit. Observed cumulative reasoning usage also motivates a
 70,000-token ceiling; the reviewed price ceiling remains only CNY 0.14/run.
+
+At commit `71d9d35`, S1 passed and S2 remained within the revised token/tool
+limits, but the 300-second run wall-time expired after the recovered thematic
+map and before area/report completion. The per-provider-call timeout remains
+120 seconds; only the encompassing serial run wall-time is raised to 600
+seconds, without changing retry, token, turn or tool limits.

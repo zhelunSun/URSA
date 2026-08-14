@@ -11,7 +11,7 @@ pilot or any 45-run repetition.
 - sampling: temperature 0, top-p 1, cache disabled;
 - retries: zero model retries and zero tool retries;
 - per model call: at most 1,024 completion tokens;
-- per run: 12 model turns, 10 tool calls (Scientist 4, Engineer 8), 300 seconds,
+- per run: 12 model turns, 10 tool calls (Scientist 4, Engineer 8), 600 seconds,
   and 70,000 recorded total tokens;
 - first comparison, if separately authorized after smoke review: 15 single
   matched runs in seeded balanced order;
@@ -23,6 +23,10 @@ and CNY 2/M output tokens), the conservative 70,000-token ceiling implies at
 most CNY 0.14 per run if charged entirely at the higher output rate, or at most
 CNY 2.10 for 15 runs. Actual usage should be lower; provider billing is
 the authoritative cost record.
+
+The provider-call timeout remains 120 seconds. The longer run wall-time only
+accommodates the serial recovery chain and observed variable model latency; it
+does not relax token, turn, tool-call or retry limits.
 
 ## L0 verification
 
