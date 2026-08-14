@@ -40,3 +40,9 @@ does not relax token, turn, tool-call or retry limits.
   returned HTTP 200; no credential was written to tracked files.
 
 The untracked local environment flag remains the independent second gate.
+
+## Result
+
+The Paratera batch at commit `a4006dc` passed all three fixed slots. See
+`paratera_live_smoke_result_20260814.md`; the local gate was then closed and
+the 15-case pilot remains pending its required human run-package review.
