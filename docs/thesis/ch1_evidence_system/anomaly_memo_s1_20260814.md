@@ -46,3 +46,11 @@ stopped the run at 21,754 recorded tokens. Runtime now requires an explicit
 revision in `revision_required` phase before any retry, and the test-stage
 ceiling is raised to 45,000 tokens (still at most CNY 0.09/run at the reviewed
 V4-Flash output rate).
+
+At commit `4cd1582`, S1 passed and S2 produced plan v2, reused its checkpoint,
+retried threshold successfully and preserved a single NDVI calculation. It
+then stopped before `calculate_area` because the Engineer tool-call cap was 6:
+the normal greenspace chain consumes six calls and the injected failure adds a
+seventh. The reviewed cap is corrected to 8 Engineer calls within the existing
+10-call global limit. Observed cumulative reasoning usage also motivates a
+70,000-token ceiling; the reviewed price ceiling remains only CNY 0.14/run.
