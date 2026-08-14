@@ -103,7 +103,10 @@ def _role_instructions() -> dict[str, str]:
         "Engineer": (
             "Return exactly one JSON object: an action using only a listed tool binding "
             '({"kind":"action","tool_name":"...","artifact_refs":["artifact-id"],"parameters":{}}), '
-            'a handoff ({"kind":"handoff","target":"Manager"}), a stop, or a revise. '
+            'a handoff ({"kind":"handoff","target":"Manager"}), '
+            'a stop ({"kind":"stop","reason":"..."}), or '
+            'a revision ({"kind":"revise","next_action":"registered_tool"}). '
+            "When the requested outputs have been produced successfully, hand off to Manager for the report. "
             "Never include paths or unlisted parameters; do not include prose outside JSON."
         ),
     }

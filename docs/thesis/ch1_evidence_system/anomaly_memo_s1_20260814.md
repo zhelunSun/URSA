@@ -31,3 +31,10 @@ complete validated artifact manifest. Runtime correctly returned
 `report_failed`; the run is retained under `authorized_smoke_rerun_47a0d3f/`.
 The report prompt is therefore aligned with the already-enforced WP3 contract:
 reference every supplied validated artifact ID exactly once and invent none.
+
+At commit `649e25a`, S1 again produced all three artifacts, then Engineer
+returned an incomplete `{"kind":"stop"}` object. The strict action parser
+correctly rejected it because `reason` is required. The Engineer prompt had
+named stop/revise as options without spelling out their schemas. The prompt is
+corrected to give the exact stop and revise objects and to require a Manager
+handoff after requested outputs have been produced.
