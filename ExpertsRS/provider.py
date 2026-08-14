@@ -107,6 +107,8 @@ def _role_instructions() -> dict[str, str]:
             'a stop ({"kind":"stop","reason":"..."}), or '
             'a revision ({"kind":"revise","next_action":"registered_tool"}). '
             "If phase is revision_required after a failed observation, return revise before any retry action. "
+            "Do not repeat a successful tool unless a revised plan explicitly requires it. "
+            "When the request's required artifacts are already present (including area_statistics for green-cover work), hand off to Manager instead of adding another action. "
             "When the requested outputs have been produced successfully, hand off to Manager for the report. "
             "Never include paths or unlisted parameters; do not include prose outside JSON."
         ),

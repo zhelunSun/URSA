@@ -77,3 +77,10 @@ hidden reasoning and returned no final JSON. A controlled 8,192-token probe
 ended normally with valid JSON (reasoning was not stored or displayed). The
 per-call completion ceiling is therefore raised to 8,192 while the outer
 70,000-token, 12-turn, 10-tool and zero-retry limits remain in force.
+
+At Paratera commit `4cf2d38`, S1 passed and S2 correctly produced the full
+recovery chain through area statistics. Engineer then proposed a duplicate
+threshold action with an unapproved parameter instead of handing off for the
+report; runtime rejected it without executing the unsafe action. The Engineer
+contract now explicitly forbids repeating successful tools and requires a
+Manager handoff when the requested artifacts are present.
