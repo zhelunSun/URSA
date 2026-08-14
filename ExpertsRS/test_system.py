@@ -97,6 +97,33 @@ class UnifiedSystemTests(unittest.TestCase):
             )
         self.assertEqual(result.status, RunStatus.CONTROLLED_STOP)
 
+    def test_recoverable_failure_requires_revision_before_direct_retry(self):
+        from ExpertsRS.decisions import ScriptedDecisionProvider
+
+        class DirectRetryProvider:
+            def __init__(self):
+                self.delegate = ScriptedDecisionProvider()
+
+            async def decide(self, role, state):
+                if role == "Engineer" and state["phase"] == "revision_required":
+                    artifact_id = next(
+                        item["artifact_id"] for item in state["artifact_manifest"]
+                        if item["artifact_type"] == "index_raster"
+                    )
+                    return {"kind": "action", "tool_name": "apply_threshold", "artifact_refs": [artifact_id]}
+                return await self.delegate.decide(role, state)
+
+        system = ExpertsRSSystem(
+            provider=DirectRetryProvider(),
+            executor=LocalToolExecutor(inject_failures={"apply_threshold": 1}),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run("Calculate green cover rate for Dongcheng", Path(directory), system=system)
+            events = [json.loads(line) for line in result.trace_path.read_text(encoding="utf-8").splitlines()]
+        actions = [event["payload"].get("tool_name") for event in events if event["event_type"] == "action_started"]
+        self.assertEqual(result.status, RunStatus.CONTROLLED_STOP)
+        self.assertEqual(actions.count("apply_threshold"), 1)
+
     def test_unsupported_and_scientifically_invalid_requests_stop(self):
         with tempfile.TemporaryDirectory() as directory:
             ndsi = self._run("Map NDSI for Dongcheng", Path(directory) / "ndsi")

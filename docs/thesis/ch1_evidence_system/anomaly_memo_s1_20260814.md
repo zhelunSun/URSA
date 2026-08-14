@@ -38,3 +38,11 @@ correctly rejected it because `reason` is required. The Engineer prompt had
 named stop/revise as options without spelling out their schemas. The prompt is
 corrected to give the exact stop and revise objects and to require a Manager
 handoff after requested outputs have been produced.
+
+At commit `72fb889`, S1 passed. S2 created and reused the NDVI checkpoint, but
+the model retried the seeded threshold failure without first emitting a
+`revise` decision. The retry succeeded, then the original 18,000-token ceiling
+stopped the run at 21,754 recorded tokens. Runtime now requires an explicit
+revision in `revision_required` phase before any retry, and the test-stage
+ceiling is raised to 45,000 tokens (still at most CNY 0.09/run at the reviewed
+V4-Flash output rate).

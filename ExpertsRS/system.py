@@ -208,6 +208,12 @@ class ExpertsRSSystem:
             while True:
                 engineer = await self._decide(state, "Engineer")
                 kind = engineer.get("kind")
+                if state["phase"] == "revision_required" and kind != "revise":
+                    return self._stop(
+                        state,
+                        "A recoverable tool failure requires an explicit plan revision before another action.",
+                        actor="Runtime",
+                    )
                 if kind == "handoff":
                     return await self._generate_manager_report(state)
                 if kind == "stop":
@@ -227,6 +233,7 @@ class ExpertsRSSystem:
                         return self._stop(state, observation["message"], actor="Runtime")
                     if not state["capabilities"]["allow_plan_revision"]:
                         return self._stop(state, observation["message"], actor="Runtime")
+                    state["phase"] = "revision_required"
         except BudgetExhausted as error:
             return self._stop(state, str(error), actor="Runtime")
         except ProviderFailure as error:

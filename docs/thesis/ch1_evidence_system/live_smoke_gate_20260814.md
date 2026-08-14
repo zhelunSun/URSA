@@ -12,16 +12,16 @@ pilot or any 45-run repetition.
 - retries: zero model retries and zero tool retries;
 - per model call: at most 1,024 completion tokens;
 - per run: 12 model turns, 10 tool calls (Scientist 4, Engineer 6), 300 seconds,
-  and 18,000 recorded total tokens;
+  and 45,000 recorded total tokens;
 - first comparison, if separately authorized after smoke review: 15 single
   matched runs in seeded balanced order;
 - failure policy: preserve the partial run and stop the batch; never replace a
   failed case or silently change provider/model.
 
 At the provider's 2026-08-14 displayed V4-Flash prices (CNY 1/M input tokens
-and CNY 2/M output tokens), the conservative 18,000-token ceiling implies less
-than CNY 0.04 per run if charged entirely at the higher output rate, or less
-than CNY 0.60 for 15 runs. Actual usage should be lower; provider billing is
+and CNY 2/M output tokens), the conservative 45,000-token ceiling implies at
+most CNY 0.09 per run if charged entirely at the higher output rate, or at most
+CNY 1.35 for 15 runs. Actual usage should be lower; provider billing is
 the authoritative cost record.
 
 ## L0 verification

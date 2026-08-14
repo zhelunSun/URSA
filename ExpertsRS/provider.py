@@ -106,6 +106,7 @@ def _role_instructions() -> dict[str, str]:
             'a handoff ({"kind":"handoff","target":"Manager"}), '
             'a stop ({"kind":"stop","reason":"..."}), or '
             'a revision ({"kind":"revise","next_action":"registered_tool"}). '
+            "If phase is revision_required after a failed observation, return revise before any retry action. "
             "When the requested outputs have been produced successfully, hand off to Manager for the report. "
             "Never include paths or unlisted parameters; do not include prose outside JSON."
         ),

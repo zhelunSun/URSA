@@ -232,7 +232,7 @@
       "max_tool_calls_engineer": 6,
       "max_wall_time_seconds": 300,
       "max_completion_tokens": 1024,
-      "max_total_tokens_recorded": 18000,
+      "max_total_tokens_recorded": 45000,
       "max_retries_per_model_call": 0,
       "max_retries_per_tool_call": 0
     },
