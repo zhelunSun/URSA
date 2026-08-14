@@ -191,14 +191,14 @@ WP4b 不得在 E1 运行中修改被冻结的实验 commit。若 E1 已开始，
 
 只有以下检查全部为 PASS，研究者才打开 API 双门禁：
 
-- [ ] WP1、WP2、WP3、WP4a 已按顺序合入且工作树干净；
-- [ ] 统一测试、`compileall`、`git diff --check` 和控制面/evaluator ≥85% coverage 通过；
-- [ ] clean venv 安装和同一 CLI/Python API 离线运行通过；
-- [ ] `execution_mode=autogen-live`、provider、model、prompt/panel/code hash 和预算进入 manifest；
-- [ ] temperature=0、cache off、provider/tool retry=0、timeout 和 token/turn/tool 上限已冻结；
-- [ ] agent view 泄漏测试通过；API key 仅存在于未跟踪环境变量；
-- [ ] live runner 调用统一 `ExpertsRSSystem`，代码中不再保留主动阻断；
-- [ ] 研究者明确批准模型、15-run 支出上限、文本外发边界和打开双门禁。
+- [x] WP1、WP2、WP3、WP4a 已按顺序合入，L0 冻结提交前工作树已核对；
+- [x] 统一测试、`compileall`、`git diff --check` 和控制面/evaluator ≥85% coverage 通过；
+- [x] clean venv 安装和同一 CLI/Python API 离线运行通过；
+- [x] `execution_mode=autogen-live`、provider、model、prompt/panel/code hash 和预算进入 manifest；
+- [x] temperature=0、cache off、provider/tool retry=0、timeout 和 token/turn/tool 上限已冻结；
+- [x] agent view 泄漏测试通过；API key 仅存在于未跟踪环境变量；
+- [x] live runner 调用统一 `ExpertsRSSystem`，代码中不再保留主动阻断；
+- [x] 研究者批准模型、15-run 保守支出上限、文本外发边界和三次 smoke 双门禁（2026-08-14）。
 
 达到 L0 后只运行三次固定 smoke，不自动续跑：
 

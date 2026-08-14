@@ -153,9 +153,10 @@ evaluation gate invokes the authoritative `ExpertsRSSystem` for all 15 slots;
 B1/B2/B3 vary only runtime capability policy, while the external evaluator
 reads the trace and artifacts. The production model-facing bridge is
 `AutoGenSelectorDecisionProvider`, whose Team executes each named role decision
-and whose state is persisted by the runtime. The live path remains blocked
-until provider, disclosure boundary, hashes and budgets are reviewed and the
-API gate is explicitly opened.
+and whose state is persisted by the runtime. On 2026-08-14 the live path was
+authorized only for the three fixed S1-S3 smoke slots after provider,
+disclosure boundary, hashes and budgets were reviewed. The 15-case pilot
+remains separately gated until those smoke artifacts pass inspection.
 
 On 2026-08-12, the same 15 slots completed a **local-tool pre-flight** with
 the deterministic decision substitute and the real registered tools. It

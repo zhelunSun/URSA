@@ -76,7 +76,7 @@ def configured_deepseek_client(panel: dict[str, Any]) -> OpenAICompatibleClient:
         )
     return OpenAICompatibleClient(
         api_key=os.getenv(protocol["provider_env"], ""),
-        base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
+        base_url=os.getenv(protocol.get("base_url_env", "DEEPSEEK_BASE_URL"), "https://api.deepseek.com/v1"),
     )
 
 

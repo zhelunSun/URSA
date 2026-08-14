@@ -37,11 +37,13 @@ class D3LightDryRunTests(unittest.TestCase):
         self.assertEqual(len(order), 15)
         self.assertEqual({slot.case_id for slot in order}, {slot.case_id for slot in slots})
 
-    def test_api_gate_remains_closed_even_with_environment_flag(self):
+    def test_reviewed_api_gate_still_requires_local_environment_flag(self):
         original = __import__("os").environ.get(API_GATE_ENV)
-        __import__("os").environ[API_GATE_ENV] = "YES"
         try:
+            __import__("os").environ.pop(API_GATE_ENV, None)
             self.assertFalse(api_calls_permitted(self.panel))
+            __import__("os").environ[API_GATE_ENV] = "YES"
+            self.assertTrue(api_calls_permitted(self.panel))
         finally:
             if original is None:
                 __import__("os").environ.pop(API_GATE_ENV, None)

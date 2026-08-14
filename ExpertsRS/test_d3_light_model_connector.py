@@ -67,7 +67,7 @@ class D3LightModelConnectorTests(unittest.TestCase):
         })
         self.assertIn("Scientist", request["messages"][0]["content"])
         self.assertEqual(request["settings"]["temperature"], 0)
-        self.assertEqual(request["settings"]["max_tokens"], 6000)
+        self.assertEqual(request["settings"]["max_tokens"], 1024)
 
     def test_request_redacts_paths_hashes_and_hidden_contracts(self):
         case = build_agent_case(self.panel, 11, "B3_checkpoint")
@@ -169,25 +169,35 @@ class D3LightModelConnectorTests(unittest.TestCase):
         self.assertNotIn("secret-value", serialized)
 
     def test_model_override_is_refused_before_client_construction(self):
-        old_model = os.environ.get("DEEPSEEK_MODEL")
-        os.environ["DEEPSEEK_MODEL"] = "other-model"
+        model_env = self.panel["proposed_run_protocol"]["model_selection"]["model_env"]
+        old_model = os.environ.get(model_env)
+        os.environ[model_env] = "other-model"
         try:
             with self.assertRaises(APIAuthorizationError):
                 configured_deepseek_client(self.panel)
         finally:
             if old_model is None:
-                os.environ.pop("DEEPSEEK_MODEL", None)
+                os.environ.pop(model_env, None)
             else:
-                os.environ["DEEPSEEK_MODEL"] = old_model
+                os.environ[model_env] = old_model
 
     def test_default_frozen_model_constructs_client_and_role_selection_is_bounded(self):
-        old_model = os.environ.pop("DEEPSEEK_MODEL", None)
+        selection = self.panel["proposed_run_protocol"]["model_selection"]
+        model_env = selection["model_env"]
+        base_url_env = selection["base_url_env"]
+        old_model = os.environ.pop(model_env, None)
+        old_base_url = os.environ.get(base_url_env)
+        os.environ[base_url_env] = "https://api.siliconflow.cn/v1"
         try:
             client = configured_deepseek_client(self.panel)
         finally:
             if old_model is not None:
-                os.environ["DEEPSEEK_MODEL"] = old_model
-        self.assertEqual(client.base_url, "https://api.deepseek.com/v1")
+                os.environ[model_env] = old_model
+            if old_base_url is None:
+                os.environ.pop(base_url_env, None)
+            else:
+                os.environ[base_url_env] = old_base_url
+        self.assertEqual(client.base_url, "https://api.siliconflow.cn/v1")
         for task_id, phase, expected_role in ((13, "initial", "Manager"), (2, "metadata", "Scientist"), (2, "recovery", "Engineer")):
             request = self.connector.build_request(
                 build_agent_case(self.panel, task_id, "B2_adaptive"), {"phase": phase}

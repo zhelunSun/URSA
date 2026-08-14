@@ -101,8 +101,14 @@ class Chapter1BenchmarkIntegrityTests(unittest.TestCase):
         self.assertEqual([item["source_task_id"] for item in seeded], [11])
         self.assertFalse(seeded[0]["fixture"]["scientific_semantics_changed"])
 
-    def test_d3_api_gate_is_closed(self):
-        self.assertFalse(self.d3["run_gate"]["api_calls_authorized"])
+    def test_d3_api_gate_authorizes_only_the_three_reviewed_smokes(self):
+        gate = self.d3["run_gate"]
+        self.assertTrue(gate["api_calls_authorized"])
+        self.assertIn("three fixed S1-S3 live smoke slots", gate["authorization_scope"])
+        self.assertIn("15-case pilot remains separately gated", gate["authorization_scope"])
+        selection = self.d3["proposed_run_protocol"]["model_selection"]
+        self.assertEqual(selection["provider"], "SiliconFlow")
+        self.assertEqual(selection["default_model"], "deepseek-ai/DeepSeek-V4-Flash")
 
     def test_d3_agent_view_does_not_leak_fixture_or_gold(self):
         agent_case = build_agent_case(self.d3, 11, "B3_checkpoint")

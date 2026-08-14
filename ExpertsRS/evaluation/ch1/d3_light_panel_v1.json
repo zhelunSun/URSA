@@ -195,7 +195,9 @@
     }
   ],
   "run_gate": {
-    "api_calls_authorized": false,
+    "api_calls_authorized": true,
+    "authorization_scope": "Exactly the three fixed S1-S3 live smoke slots; the 15-case pilot remains separately gated.",
+    "authorized_on": "2026-08-14",
     "required_before_api": [
       "validate the panel against the frozen 20-task source",
       "freeze the evaluator without exposing task contracts to tested agents",
@@ -205,12 +207,14 @@
     ]
   },
   "proposed_run_protocol": {
-    "status": "frozen_no_api_candidate",
+    "status": "frozen_live_smoke_authorized",
     "model_selection": {
-      "provider_env": "DEEPSEEK_API_KEY",
-      "model_env": "DEEPSEEK_MODEL",
-      "default_model": "deepseek-ai/DeepSeek-V3",
-      "rationale": "This is the existing tool-capable ReAct default; using it for B1/B2/B3 avoids conflating mechanism effects with a model change.",
+      "provider": "SiliconFlow",
+      "provider_env": "SILICONFLOW_API_KEY",
+      "base_url_env": "SILICONFLOW_BASE_URL",
+      "model_env": "EXPERTSRS_D3_LIGHT_MODEL",
+      "default_model": "deepseek-ai/DeepSeek-V4-Flash",
+      "rationale": "Use one inexpensive tool-capable model for S1-S3 and all B1/B2/B3 pilot arms so mechanism effects are not confounded with a model change.",
       "single_model_only": true
     },
     "sampling": {
@@ -227,7 +231,7 @@
       "max_tool_calls_scientist": 4,
       "max_tool_calls_engineer": 6,
       "max_wall_time_seconds": 300,
-      "max_completion_tokens": 6000,
+      "max_completion_tokens": 1024,
       "max_total_tokens_recorded": 18000,
       "max_retries_per_model_call": 0,
       "max_retries_per_tool_call": 0
