@@ -249,6 +249,8 @@ class ExpertsRSSystem:
             "request": state["request"],
             "phase": state["phase"],
             "user_answers": state["user_answers"],
+            "input_data_available": bool(state["data_paths"]),
+            "input_data_count": len(state["data_paths"]),
             "available_tools": [binding.model_dump(mode="json") for binding in self.TOOL_BINDINGS.values()],
             "observations": [self._redact_observation(item) for item in state["observations"]],
             "artifact_manifest": [self._model_artifact_record(item) for item in state["artifacts"]],

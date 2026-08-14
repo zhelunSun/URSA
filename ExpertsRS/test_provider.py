@@ -106,6 +106,8 @@ class ProviderTests(unittest.TestCase):
             manifest = json.loads((root / "redacted" / "manifest.json").read_text(encoding="utf-8"))
         serialized_views = json.dumps(provider.views)
         self.assertEqual(result.status, RunStatus.COMPLETED)
+        self.assertTrue(all(view["input_data_available"] for view in provider.views))
+        self.assertTrue(all(view["input_data_count"] == 1 for view in provider.views))
         self.assertNotIn(str(SCENE), serialized_views)
         self.assertNotIn("output_path", serialized_views)
         self.assertNotIn("fixture", serialized_views)

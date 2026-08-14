@@ -86,6 +86,7 @@ def _role_instructions() -> dict[str, str]:
             '{"kind":"clarify","question":"..."} or '
             '{"kind":"handoff","target":"Scientist"}, or, when phase is report, '
             '{"kind":"report","summary":"...","artifact_refs":["artifact-id"]}. '
+            "If input_data_available is true, the local runtime already has the input; do not ask for a file path or upload. "
             "Do not include paths, data values, or prose outside JSON."
         ),
         "Scientist": (
