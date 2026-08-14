@@ -209,6 +209,10 @@ WP4b 不得在 E1 运行中修改被冻结的实验 commit。若 E1 已开始，
 > pilot；它使用单独的 `pilot_authorized` panel gate、Paratera 的同一模型和不可覆盖的批次汇总。此前
 > SiliconFlow 结果仍作为保留的 provider-stability anomaly。
 
+> 2026-08-14 完成记录：Paratera `DeepSeek-V4-Flash` 已在冻结 pilot 中完成 15/15 evaluator PASS，
+> 详见 `paratera_pilot_result_20260814.md`。这完成真实模型集成与运行证据闭环，但不自动升级为方法
+> 效果或科学准确性结论；下一步是外部 outcome 分析与 claim-safe 结果备忘。
+
 | Smoke | 场景 | 必须观察到 |
 | --- | --- | --- |
 | S1 | 普通 NDVI | completed、真实 raster/map、有效报告、完整 trace |
