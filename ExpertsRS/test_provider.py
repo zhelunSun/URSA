@@ -33,8 +33,14 @@ class ProviderTests(unittest.TestCase):
         self.assertIn("absent from available_tools", _role_instructions()["Scientist"])
 
     def test_role_contract_requires_metadata_before_lst_stop(self):
-        self.assertIn("operation lst", _role_instructions()["Scientist"])
-        self.assertIn("thermal-precondition", _role_instructions()["Engineer"])
+        self.assertIn("metadata must be the first eligible node", _role_instructions()["Scientist"])
+        self.assertIn("LST precondition task", _role_instructions()["Engineer"])
+
+    def test_scientist_contract_includes_a_concrete_v2_ndvi_schema(self):
+        instruction = _role_instructions()["Scientist"]
+        self.assertIn("expertsrs.read_raster_metadata.v1", instruction)
+        self.assertIn("expected_outputs", instruction)
+        self.assertIn("inputs must be an object", instruction)
 
     def test_scripted_mode_is_explicit_in_result_and_manifest(self):
         with tempfile.TemporaryDirectory() as directory:

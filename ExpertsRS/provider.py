@@ -105,7 +105,17 @@ def _role_instructions() -> dict[str, str]:
             '"workflow":{"workflow_id":"...","input_artifacts":[{"artifact_id":"input_raster","artifact_type":"raster"}],"nodes":[...]}} '
             'or {"kind":"revise","reason":"...","base_plan_id":"...","affected_node_ids":["..."],"task":...,"workflow":...} '
             'or {"kind":"stop","reason":"..."}. '
-            "Each workflow node needs node_id, one listed operator_id, logical input artifact IDs, an output_artifact_id, exact safe config and depends_on. "
+            "Every expected_outputs entry must be exactly one of metadata, index_raster, mask_raster, map, area_statistics. "
+            "Every node must have exactly node_id, operator_id, inputs, output_artifact_id, config, depends_on. "
+            "operator_id must be a full listed identifier, never a short tool name. inputs must be an object, never input_artifact_ids. config must be an object, never safe_parameters. "
+            "For an NDVI map, use this exact structural pattern (replace only task_id and goal): "
+            '{"kind":"plan","task":{"task_id":"ndvi_task","goal":"...","expected_outputs":["metadata","index_raster","map"],"requested_outputs":["ndvi_map"],"required_metrics":[],"constraints":{"operation":"ndvi"}},'
+            '"workflow":{"workflow_id":"ndvi_workflow","input_artifacts":[{"artifact_id":"input_raster","artifact_type":"raster"}],"nodes":['
+            '{"node_id":"metadata","operator_id":"expertsrs.read_raster_metadata.v1","inputs":{"file_path":"input_raster"},"output_artifact_id":"metadata","config":{},"depends_on":[]},'
+            '{"node_id":"ndvi","operator_id":"expertsrs.calculate_ndvi.v1","inputs":{"file_path":"input_raster"},"output_artifact_id":"ndvi_raster","config":{},"depends_on":["metadata"]},'
+            '{"node_id":"index_map","operator_id":"expertsrs.plot_index_map.v1","inputs":{"file_path":"ndvi_raster"},"output_artifact_id":"ndvi_map","config":{},"depends_on":["ndvi"]}]}}. '
+            "For green cover, add threshold (expertsrs.apply_threshold.v1, input ndvi_raster, output greenspace_mask, config {\"threshold_low\":0.3}, depends_on ndvi), "
+            "then thematic_map (expertsrs.plot_thematic_map.v1) and area_statistics (expertsrs.calculate_area.v1) from greenspace_mask; expected_outputs must include mask_raster and area_statistics, required_metrics must be [\"green_cover_rate\"]. "
             "The only raw input artifact is input_raster; never include a URI, path, data value, or unlisted tool. "
             "For an initial supplied raster, metadata must be the first eligible node before analysis nodes. "
             "If the user requests a named index/operator that is absent from available_tools, return stop with a concise unsupported-catalog reason; do not ask the user to define it and do not substitute another index. "
