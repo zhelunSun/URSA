@@ -93,10 +93,14 @@ class WorkflowTrace:
         plan_version_id: str,
         permission_decision_id: str,
         branch_id: str = "main",
+        plan_node_id: str | None = None,
     ) -> str:
+        payload = {"tool_name": tool_name, "arguments": arguments, "branch_id": branch_id}
+        if plan_node_id is not None:
+            payload["plan_node_id"] = plan_node_id
         return self.record(
             "action_started",
-            {"tool_name": tool_name, "arguments": arguments, "branch_id": branch_id},
+            payload,
             actor=actor,
             object_id=action_id,
             references=(
@@ -129,10 +133,13 @@ class WorkflowTrace:
         uri: str,
         validated: bool,
         artifact_type: str | None = None,
+        plan_node_id: str | None = None,
     ) -> str:
         payload = {"uri": uri, "validated": validated}
         if artifact_type is not None:
             payload["artifact_type"] = artifact_type
+        if plan_node_id is not None:
+            payload["plan_node_id"] = plan_node_id
         return self.record(
             "artifact_recorded",
             payload,

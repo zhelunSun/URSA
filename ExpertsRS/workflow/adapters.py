@@ -12,6 +12,7 @@ I = ArtifactType.INDEX_RASTER
 M = ArtifactType.MASK_RASTER
 META = ArtifactType.METADATA
 MAP = ArtifactType.MAP
+AREA = ArtifactType.AREA_STATISTICS
 
 
 def _spec(
@@ -82,7 +83,7 @@ def build_operator_catalog() -> dict[str, OperatorSpec]:
             },
         ),
         "expertsrs.apply_threshold.v1": _spec("apply_threshold", {"file_path": (I,)}, M, preconditions=("file_exists",), default_config={"threshold_low": 0.3}),
-        "expertsrs.calculate_area.v1": _spec("calculate_area", {"file_path": (M,)}, META, preconditions=("file_exists",)),
+        "expertsrs.calculate_area.v1": _spec("calculate_area", {"file_path": (M,)}, AREA, preconditions=("file_exists",)),
         "expertsrs.apply_mask.v1": _spec("apply_mask", {"input_file": (R, I), "mask_file": (M,)}, R, preconditions=("file_exists",)),
         "expertsrs.zonal_statistics.v1": _spec("zonal_statistics", {"value_file": (R, I), "zone_file": (M,)}, META, preconditions=("file_exists",)),
         "expertsrs.plot_index_map.v1": _spec("plot_index_map", {"file_path": (I,)}, MAP, preconditions=("file_exists",)),

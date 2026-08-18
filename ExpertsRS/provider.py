@@ -85,7 +85,7 @@ def _role_instructions() -> dict[str, str]:
             "Return exactly one JSON object: either "
             '{"kind":"clarify","question":"..."} or '
             '{"kind":"handoff","target":"Scientist"}, or, when phase is report, '
-            '{"kind":"report","summary":"...","artifact_refs":["artifact-id"]}. '
+            '{"kind":"report","summary":"...","artifact_refs":["artifact-id"],"deliverables":[...]}. '
             "If input_data_available is true, the local runtime already has the input; do not ask for a file path or upload. "
             "Clarify only when the requested analysis goal, metric, or output is semantically ambiguous. "
             "A request for vegetation health or health condition without a named metric (for example NDVI, green cover, or a physiological indicator) is semantically ambiguous and must receive one concise clarification question. "
@@ -94,29 +94,34 @@ def _role_instructions() -> dict[str, str]:
             "the Scientist and registered tools must inspect those technical preconditions. "
             "When phase is report, artifact_refs must contain every artifact_id listed in artifact_manifest exactly once; "
             "do not omit a validated artifact and do not invent an ID. "
+            "When report_deliverables is supplied, copy every factual deliverable exactly: preserve its value, unit, scope, "
+            "and artifact_refs.  In particular, never rename a valid-image-pixel percentage as an administrative-area rate. "
+            "Include it as the report JSON field deliverables. "
             "Do not include paths, data values, or prose outside JSON."
         ),
         "Scientist": (
             "Return exactly one JSON object: either "
-            '{"kind":"plan","operation":"ndvi|greenspace|lst","next_action":"read_raster_metadata"} '
+            '{"kind":"plan","task":{"task_id":"...","goal":"...","expected_outputs":["..."],"requested_outputs":["..."],"required_metrics":["..."],"constraints":{}},'
+            '"workflow":{"workflow_id":"...","input_artifacts":[{"artifact_id":"input_raster","artifact_type":"raster"}],"nodes":[...]}} '
+            'or {"kind":"revise","reason":"...","base_plan_id":"...","affected_node_ids":["..."],"task":...,"workflow":...} '
             'or {"kind":"stop","reason":"..."}. '
-            "For a new supplied raster, next_action must be read_raster_metadata; otherwise use only a listed registered tool name. "
+            "Each workflow node needs node_id, one listed operator_id, logical input artifact IDs, an output_artifact_id, exact safe config and depends_on. "
+            "The only raw input artifact is input_raster; never include a URI, path, data value, or unlisted tool. "
+            "For an initial supplied raster, metadata must be the first eligible node before analysis nodes. "
             "If the user requests a named index/operator that is absent from available_tools, return stop with a concise unsupported-catalog reason; do not ask the user to define it and do not substitute another index. "
-            "Exception: for LST or thermal requests, return a plan with operation lst and next_action read_raster_metadata so the Engineer can check the thermal precondition from the supplied raster. "
+            "For phase revision_required, return a full revised graph whose affected_node_ids include the observed failed node and only its downstream subgraph; base_plan_id must equal active_plan_id. "
             "Do not include paths, tool arguments, or prose outside JSON."
         ),
         "Engineer": (
-            "Return exactly one JSON object: an action using only a listed tool binding "
-            '({"kind":"action","tool_name":"...","artifact_refs":["artifact-id"],"parameters":{}}), '
+            "Return exactly one JSON object: an action selecting exactly one eligible plan node "
+            '({"kind":"action","node_id":"..."}), '
             'a handoff ({"kind":"handoff","target":"Manager"}), '
-            'a stop ({"kind":"stop","reason":"..."}), or '
-            'a revision ({"kind":"revise","next_action":"registered_tool"}). '
-            "If phase is revision_required after a failed observation, return revise before any retry action. "
-            "Follow current_plan.next_action before another tool when it is a listed tool that has not yet succeeded. "
-            "For current_plan.operation lst, first read metadata; then return stop with a thermal-precondition reason rather than inventing an LST action. "
-            "Do not repeat a successful tool unless a revised plan explicitly requires it. "
-            "When the request's required artifacts are already present (including area_statistics for green-cover work), hand off to Manager instead of adding another action. "
+            'or a stop ({"kind":"stop","reason":"..."}). '
+            "Choose only an ID in eligible_node_ids.  Do not name a tool, artifact reference, parameter, path or retry strategy; the runtime binds those from the Scientist plan. "
+            "If phase is revision_required, do not act: the Scientist must revise the plan. "
+            "For an LST precondition task, stop after metadata rather than inventing an LST action. "
+            "Hand off only after every planned node has succeeded. "
             "When the requested outputs have been produced successfully, hand off to Manager for the report. "
-            "Never include paths or unlisted parameters; do not include prose outside JSON."
+            "Do not include prose outside JSON."
         ),
     }

@@ -14,6 +14,7 @@ class ArtifactType(str, Enum):
     METADATA = "metadata"
     MAP = "map"
     REPORT = "report"
+    AREA_STATISTICS = "area_statistics"
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,8 @@ class TaskSpec:
     constraints: dict[str, Any] = field(default_factory=dict)
     validation_needs: tuple[str, ...] = ()
     unresolved_questions: tuple[str, ...] = ()
+    requested_outputs: tuple[str, ...] = ()
+    required_metrics: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -72,6 +75,7 @@ class WorkflowNode:
     inputs: dict[str, str]
     output_artifact_id: str
     config: dict[str, Any] = field(default_factory=dict)
+    depends_on: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -2,6 +2,7 @@
 
 from .adapters import build_operator_catalog
 from .graph import WorkflowGraph
+from .planning import hydrate_task, hydrate_workflow
 from .repair import apply_targeted_repair
 from .runtime import (
     Checkpoint,
@@ -22,6 +23,7 @@ from .validator import ValidationReport, validate_workflow
 
 __all__ = [
     "ArtifactSpec", "ArtifactType", "TaskSpec", "WorkflowGraph", "WorkflowNode",
+    "hydrate_task", "hydrate_workflow",
     "WorkflowTrace", "ValidationReport", "apply_targeted_repair",
     "build_operator_catalog", "validate_workflow", "Checkpoint",
     "EventReference", "LocalPermissionPolicy", "PermissionDecision",

@@ -15,20 +15,20 @@ from pydantic import ValidationError
 from .models import (
     EngineerActionDecision,
     EngineerHandoffDecision,
-    EngineerReviseDecision,
     EngineerStopDecision,
     ManagerClarifyDecision,
     ManagerHandoffDecision,
     ReportDecision,
     ScientistPlanDecision,
+    ScientistReviseDecision,
     ScientistStopDecision,
 )
 
 
 ROLE_DECISION_MODELS: dict[str, tuple[type[Any], ...]] = {
     "Manager": (ManagerClarifyDecision, ManagerHandoffDecision, ReportDecision),
-    "Scientist": (ScientistPlanDecision, ScientistStopDecision),
-    "Engineer": (EngineerActionDecision, EngineerHandoffDecision, EngineerStopDecision, EngineerReviseDecision),
+    "Scientist": (ScientistPlanDecision, ScientistReviseDecision, ScientistStopDecision),
+    "Engineer": (EngineerActionDecision, EngineerHandoffDecision, EngineerStopDecision),
 }
 
 
@@ -78,24 +78,87 @@ class ScriptedDecisionProvider:
             return "ndvi"
         return "clarify_scope"
 
+    @staticmethod
+    def _workflow(operation: str, request: str, *, recovery: bool = False) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Deterministic v2 plans used by the offline harness.
+
+        They exercise the same serialized contract required from a live
+        Scientist without giving the Engineer an implicit action sequence.
+        """
+        base_artifact = {"artifact_id": "input_raster", "artifact_type": "raster"}
+        metadata = {
+            "node_id": "metadata", "operator_id": "expertsrs.read_raster_metadata.v1",
+            "inputs": {"file_path": "input_raster"}, "output_artifact_id": "metadata",
+            "config": {}, "depends_on": [],
+        }
+        ndvi = {
+            "node_id": "ndvi", "operator_id": "expertsrs.calculate_ndvi.v1",
+            "inputs": {"file_path": "input_raster"}, "output_artifact_id": "ndvi_raster",
+            "config": {}, "depends_on": ["metadata"],
+        }
+        if operation == "lst":
+            task = {
+                "task_id": "lst_task", "goal": request, "expected_outputs": ["metadata"],
+                "requested_outputs": ["thermal_precondition"], "required_metrics": [],
+                "constraints": {"operation": "lst"},
+            }
+            return task, {"workflow_id": "lst_workflow", "input_artifacts": [base_artifact], "nodes": [metadata]}
+
+        map_node = {
+            "node_id": "index_map", "operator_id": "expertsrs.plot_index_map.v1",
+            "inputs": {"file_path": "ndvi_raster"}, "output_artifact_id": "ndvi_map",
+            "config": {}, "depends_on": ["ndvi"],
+        }
+        if operation != "greenspace":
+            task = {
+                "task_id": "ndvi_task", "goal": request,
+                "expected_outputs": ["metadata", "index_raster", "map"],
+                "requested_outputs": ["ndvi_map"], "required_metrics": [],
+                "constraints": {"operation": "ndvi"},
+            }
+            return task, {"workflow_id": "ndvi_workflow", "input_artifacts": [base_artifact], "nodes": [metadata, ndvi, map_node]}
+
+        threshold = {
+            "node_id": "threshold", "operator_id": "expertsrs.apply_threshold.v1",
+            "inputs": {"file_path": "ndvi_raster"}, "output_artifact_id": "greenspace_mask",
+            "config": {"threshold_low": 0.3}, "depends_on": ["ndvi"],
+        }
+        thematic = {
+            "node_id": "thematic_map", "operator_id": "expertsrs.plot_thematic_map.v1",
+            "inputs": {"file_path": "greenspace_mask"}, "output_artifact_id": "greenspace_map",
+            "config": {}, "depends_on": ["threshold"],
+        }
+        area = {
+            "node_id": "area_statistics", "operator_id": "expertsrs.calculate_area.v1",
+            "inputs": {"file_path": "greenspace_mask"}, "output_artifact_id": "greenspace_area",
+            "config": {}, "depends_on": ["threshold"],
+        }
+        task = {
+            "task_id": "greenspace_task", "goal": request,
+            "expected_outputs": ["metadata", "index_raster", "mask_raster", "map", "area_statistics"],
+            "requested_outputs": ["greenspace_map", "green_cover_rate"],
+            "required_metrics": ["green_cover_rate"],
+            "constraints": {"operation": "greenspace"},
+        }
+        return task, {
+            "workflow_id": "greenspace_workflow",
+            "input_artifacts": [base_artifact],
+            "nodes": [metadata, ndvi, threshold, thematic, area],
+        }
+
     async def decide(self, role: str, state: dict[str, Any]) -> dict[str, Any]:
         operation = self._operation(" ".join([state["request"], *state.get("user_answers", [])]))
-        observations = state.get("observations", [])
         phase = state.get("phase", "initial")
-
-        def artifact_ref(artifact_type: str) -> list[str]:
-            for observation in reversed(observations):
-                if observation.get("artifact_type") == artifact_type and isinstance(observation.get("artifact_id"), str):
-                    return [observation["artifact_id"]]
-            return []
 
         if role == "Manager":
             if phase == "report":
                 artifacts = state.get("artifact_manifest", [])
+                deliverables = state.get("report_deliverables", [])
                 return {
                     "kind": "report",
                     "summary": f"已完成对“{state['request']}”的受控本地分析。结果仅包含下列已验证制品。",
                     "artifact_refs": [item["artifact_id"] for item in artifacts],
+                    "deliverables": deliverables,
                 }
             if operation in {"clarify_health", "clarify_scope"} and not state.get("user_answers"):
                 return {
@@ -108,44 +171,38 @@ class ScriptedDecisionProvider:
             if operation == "unsupported_ndsi":
                 return {"kind": "stop", "reason": "NDSI is not supported by the registered ExpertsRS tool catalog."}
             if operation == "lst":
-                return {"kind": "plan", "operation": "lst", "next_action": "read_raster_metadata"}
+                task, workflow = self._workflow("lst", state["request"])
+                return {"kind": "plan", "task": task, "workflow": workflow}
             if phase in {"initial", "planning"}:
+                task, workflow = self._workflow("greenspace" if operation == "greenspace" else "ndvi", state["request"])
                 return {
                     "kind": "plan",
-                    "operation": "greenspace" if operation == "greenspace" else "ndvi",
-                    "next_action": "read_raster_metadata",
+                    "task": task,
+                    "workflow": workflow,
                 }
-            return {"kind": "handoff", "target": "Engineer"}
+            if phase == "revision_required":
+                task, workflow = self._workflow("greenspace", state["request"], recovery=True)
+                return {
+                    "kind": "revise", "reason": "Retry only the failed threshold branch after the observed transient failure.",
+                    "base_plan_id": state["active_plan_id"],
+                    "affected_node_ids": ["threshold", "thematic_map", "area_statistics"],
+                    "task": task, "workflow": workflow,
+                }
+            return {"kind": "stop", "reason": "No safe Scientist decision is available."}
 
         if role == "Engineer":
-            successes = [item.get("tool") for item in observations if item.get("success")]
-            last = observations[-1] if observations else {}
             if operation == "lst":
-                if not successes:
-                    return {"kind": "action", "tool_name": "read_raster_metadata"}
+                eligible = state.get("eligible_node_ids", [])
+                if eligible:
+                    return {"kind": "action", "node_id": eligible[0]}
                 return {
                     "kind": "stop",
                     "reason": "Thermal precondition failed: LST requires Landsat-8 Band 10 TOA radiance; the supplied Sentinel-2 raster is not admissible.",
                 }
-            if not successes:
-                return {"kind": "action", "tool_name": "read_raster_metadata"}
-            if "calculate_ndvi" not in successes:
-                return {"kind": "action", "tool_name": "calculate_ndvi"}
-            if operation in {"ndvi", "clarify_health", "clarify_scope"}:
-                if "plot_index_map" not in successes:
-                    return {"kind": "action", "tool_name": "plot_index_map", "artifact_refs": artifact_ref("index_raster")}
-                return {"kind": "handoff", "target": "Manager"}
-            if operation == "greenspace":
-                if last.get("tool") == "apply_threshold" and not last.get("success") and phase != "recovery":
-                    return {"kind": "revise", "next_action": "apply_threshold"}
-                if "apply_threshold" not in successes:
-                    return {"kind": "action", "tool_name": "apply_threshold", "artifact_refs": artifact_ref("index_raster"), "parameters": {"threshold_low": 0.3}}
-                if "plot_thematic_map" not in successes:
-                    return {"kind": "action", "tool_name": "plot_thematic_map", "artifact_refs": artifact_ref("mask_raster")}
-                if "calculate_area" not in successes:
-                    return {"kind": "action", "tool_name": "calculate_area", "artifact_refs": artifact_ref("mask_raster")}
-                return {"kind": "handoff", "target": "Manager"}
-            return {"kind": "stop", "reason": "No safe action is available for this request."}
+            eligible = state.get("eligible_node_ids", [])
+            if eligible:
+                return {"kind": "action", "node_id": eligible[0]}
+            return {"kind": "handoff", "target": "Manager"}
 
         raise ValueError(f"Unknown role: {role}")
 

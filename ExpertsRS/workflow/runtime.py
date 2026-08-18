@@ -43,6 +43,8 @@ class PlanVersion:
     trigger_event_id: str | None = None
     restart_from_checkpoint_id: str | None = None
     status: str = "active"
+    workflow_id: str | None = None
+    affected_node_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.plan_id or self.version < 1:
@@ -70,6 +72,7 @@ class Checkpoint:
     valid_artifact_ids: tuple[str, ...]
     branch_id: str = "main"
     reason: str = ""
+    source_plan_node_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.checkpoint_id or not self.plan_version_id or not self.resume_after_event_id:

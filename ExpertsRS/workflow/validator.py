@@ -23,6 +23,8 @@ class ViolationCode(str, Enum):
     INVALID_CONFIG = "invalid_config"
     OUTPUT_TYPE_MISMATCH = "output_type_mismatch"
     MISSING_EXPECTED_OUTPUT = "missing_expected_output"
+    UNKNOWN_DEPENDENCY = "unknown_dependency"
+    CYCLIC_DEPENDENCY = "cyclic_dependency"
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,21 @@ def validate_workflow(
             violations.append(Violation(ViolationCode.UNKNOWN_OPERATOR, node.node_id,
                 f"No contract exists for operator '{node.operator_id}'."))
             continue
+
+        for dependency_id in node.depends_on:
+            dependency_position = node_positions.get(dependency_id)
+            if dependency_position is None:
+                violations.append(Violation(
+                    ViolationCode.UNKNOWN_DEPENDENCY, node.node_id,
+                    f"Node '{node.node_id}' depends on unknown node '{dependency_id}'.",
+                    {"dependency_id": dependency_id},
+                ))
+            elif dependency_position >= position:
+                violations.append(Violation(
+                    ViolationCode.INVALID_ORDER, node.node_id,
+                    f"Node '{node.node_id}' must depend only on an earlier node.",
+                    {"dependency_id": dependency_id},
+                ))
 
         output_artifact = graph.artifacts.get(node.output_artifact_id)
         if output_artifact is None or output_artifact.artifact_type != operator.output_type:
@@ -169,4 +186,27 @@ def validate_workflow(
             violations.append(Violation(ViolationCode.MISSING_EXPECTED_OUTPUT, None,
                 f"Task requires '{expected.value}', but no workflow artifact produces it.",
                 {"expected_output": expected.value}))
+
+    dependencies = {node.node_id: graph.predecessor_ids(node) for node in graph.nodes}
+    visited: set[str] = set()
+    active: set[str] = set()
+
+    def visit(node_id: str) -> None:
+        if node_id in active:
+            violations.append(Violation(
+                ViolationCode.CYCLIC_DEPENDENCY, node_id,
+                f"Workflow contains a dependency cycle at '{node_id}'.",
+            ))
+            return
+        if node_id in visited:
+            return
+        visited.add(node_id)
+        active.add(node_id)
+        for parent in dependencies.get(node_id, set()):
+            if parent in dependencies:
+                visit(parent)
+        active.remove(node_id)
+
+    for node_id in dependencies:
+        visit(node_id)
     return ValidationReport(graph.workflow_id, violations)

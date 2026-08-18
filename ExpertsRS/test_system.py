@@ -100,21 +100,17 @@ class UnifiedSystemTests(unittest.TestCase):
     def test_recoverable_failure_requires_revision_before_direct_retry(self):
         from ExpertsRS.decisions import ScriptedDecisionProvider
 
-        class DirectRetryProvider:
+        class MissingScientistRevisionProvider:
             def __init__(self):
                 self.delegate = ScriptedDecisionProvider()
 
             async def decide(self, role, state):
-                if role == "Engineer" and state["phase"] == "revision_required":
-                    artifact_id = next(
-                        item["artifact_id"] for item in state["artifact_manifest"]
-                        if item["artifact_type"] == "index_raster"
-                    )
-                    return {"kind": "action", "tool_name": "apply_threshold", "artifact_refs": [artifact_id]}
+                if role == "Scientist" and state["phase"] == "revision_required":
+                    return {"kind": "stop", "reason": "Engineer cannot revise a Scientist plan."}
                 return await self.delegate.decide(role, state)
 
         system = ExpertsRSSystem(
-            provider=DirectRetryProvider(),
+            provider=MissingScientistRevisionProvider(),
             executor=LocalToolExecutor(inject_failures={"apply_threshold": 1}),
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -130,7 +126,10 @@ class UnifiedSystemTests(unittest.TestCase):
                 if role == "Manager":
                     return {"kind": "handoff", "target": "Scientist"}
                 if role == "Scientist":
-                    return {"kind": "plan", "operation": "ndvi", "next_action": "not_a_registered_tool"}
+                    from ExpertsRS.decisions import ScriptedDecisionProvider
+                    task, workflow = ScriptedDecisionProvider._workflow("ndvi", state["request"])
+                    workflow["nodes"][0]["operator_id"] = "expertsrs.not_a_registered_tool.v1"
+                    return {"kind": "plan", "task": task, "workflow": workflow}
                 raise AssertionError("Engineer must not be called for an invalid Scientist plan")
 
         with tempfile.TemporaryDirectory() as directory:
@@ -237,20 +236,20 @@ class UnifiedSystemTests(unittest.TestCase):
                 self.assertEqual(result.validation.tool_calls, 0)
 
     def test_action_requires_a_registered_artifact_id_not_a_type_or_path(self):
-        class WrongReferenceProvider:
+        class NonEligibleNodeProvider:
             async def decide(self, role, state):
                 if role == "Manager":
                     return {"kind": "handoff", "target": "Scientist"}
                 if role == "Scientist":
-                    return {"kind": "plan", "operation": "ndvi", "next_action": "read_raster_metadata"}
-                if not state["observations"]:
-                    return {"kind": "action", "tool_name": "read_raster_metadata"}
-                return {"kind": "action", "tool_name": "plot_index_map", "artifact_refs": ["index_raster"]}
+                    from ExpertsRS.decisions import ScriptedDecisionProvider
+                    task, workflow = ScriptedDecisionProvider._workflow("ndvi", state["request"])
+                    return {"kind": "plan", "task": task, "workflow": workflow}
+                return {"kind": "action", "node_id": "index_map"}
 
         with tempfile.TemporaryDirectory() as directory:
-            result = self._run("Map NDVI", Path(directory), system=ExpertsRSSystem(provider=WrongReferenceProvider()))
+            result = self._run("Map NDVI", Path(directory), system=ExpertsRSSystem(provider=NonEligibleNodeProvider()))
         self.assertEqual(result.status, RunStatus.CONTROLLED_STOP)
-        self.assertEqual(result.validation.tool_calls, 1)
+        self.assertEqual(result.validation.tool_calls, 0)
 
 
 if __name__ == "__main__":

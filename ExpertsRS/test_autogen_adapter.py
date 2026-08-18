@@ -86,14 +86,16 @@ class AutoGenAdapterTests(unittest.TestCase):
         self.assertTrue(state["agent_states"]["manager"]["agent_state"]["llm_context"]["messages"])
 
     def test_unified_runtime_persists_actual_team_state(self):
+        from ExpertsRS.decisions import ScriptedDecisionProvider
+        task, workflow = ScriptedDecisionProvider._workflow("ndvi", "Map NDVI")
         responses = iter([
             '{"kind":"handoff","target":"Scientist"}',
-            '{"kind":"plan","operation":"ndvi","next_action":"read_raster_metadata"}',
-            '{"kind":"action","tool_name":"read_raster_metadata"}',
-            '{"kind":"action","tool_name":"calculate_ndvi"}',
-            '{"kind":"action","tool_name":"plot_index_map","artifact_refs":["team:action:02:index_raster"]}',
+            json.dumps({"kind": "plan", "task": task, "workflow": workflow}),
+            '{"kind":"action","node_id":"metadata"}',
+            '{"kind":"action","node_id":"ndvi"}',
+            '{"kind":"action","node_id":"index_map"}',
             '{"kind":"handoff","target":"Manager"}',
-            '{"kind":"report","summary":"Completed local NDVI analysis.","artifact_refs":["team:action:01:metadata","team:action:02:index_raster","team:action:03:map"]}',
+            '{"kind":"report","summary":"Completed local NDVI analysis.","artifact_refs":["team:action:01:metadata","team:action:02:index_raster","team:action:03:map"],"deliverables":[{"deliverable_id":"ndvi_map","status":"delivered","value":"NDVI map","unit":null,"scope":"supplied raster extent","artifact_refs":["team:action:03:map"]}]}',
         ])
 
         class SequencedClient(type(self._client("{}"))):
@@ -122,10 +124,13 @@ class AutoGenAdapterTests(unittest.TestCase):
 
     def test_live_run_records_usage_and_stops_at_total_token_budget(self):
         from ExpertsRS import ExecutionMode, ProviderConfig, RunBudgets
+        from ExpertsRS.decisions import ScriptedDecisionProvider
+
+        task, workflow = ScriptedDecisionProvider._workflow("ndvi", "Map NDVI")
 
         responses = iter([
             '{"kind":"handoff","target":"Scientist"}',
-            '{"kind":"plan","operation":"ndvi","next_action":"read_raster_metadata"}',
+            json.dumps({"kind": "plan", "task": task, "workflow": workflow}),
         ])
 
         class SequencedClient(type(self._client("{}"))):

@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 class RunStatus(StrEnum):
     COMPLETED = "completed"
+    PARTIAL = "partial"
     NEEDS_CLARIFICATION = "needs_clarification"
     CONTROLLED_STOP = "controlled_stop"
     FAILED = "failed"
@@ -92,11 +93,73 @@ class ManagerHandoffDecision(BaseModel):
     target: Literal["Scientist"]
 
 
+class PlannedArtifactDecision(BaseModel):
+    """A model-visible logical artifact.  URIs are runtime-only facts."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_id: str = Field(pattern=r"^[a-z][a-z0-9_:-]*$")
+    artifact_type: Literal[
+        "raster", "index_raster", "mask_raster", "metadata", "map", "report", "area_statistics",
+    ]
+
+
+class PlannedNodeDecision(BaseModel):
+    """One symbolic node in the Scientist's workflow proposal."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    node_id: str = Field(pattern=r"^[a-z][a-z0-9_:-]*$")
+    operator_id: str = Field(pattern=r"^expertsrs\.[a-z][a-z0-9_]*\.v1$")
+    inputs: dict[str, str] = Field(default_factory=dict)
+    output_artifact_id: str = Field(pattern=r"^[a-z][a-z0-9_:-]*$")
+    config: dict[str, Any] = Field(default_factory=dict)
+    depends_on: list[str] = Field(default_factory=list)
+
+
+class TaskSpecDecision(BaseModel):
+    """Serializable, path-free TaskSpec accepted at the model boundary."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: str = Field(pattern=r"^[a-z][a-z0-9_:-]*$")
+    goal: str = Field(min_length=1, max_length=2_000)
+    expected_outputs: list[Literal[
+        "raster", "index_raster", "mask_raster", "metadata", "map", "report", "area_statistics",
+    ]] = Field(min_length=1)
+    requested_outputs: list[str] = Field(default_factory=list)
+    required_metrics: list[str] = Field(default_factory=list)
+    constraints: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkflowGraphDecision(BaseModel):
+    """Path-free graph payload; runtime hydrates only its declared input IDs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_id: str = Field(pattern=r"^[a-z][a-z0-9_:-]*$")
+    input_artifacts: list[PlannedArtifactDecision] = Field(min_length=1)
+    nodes: list[PlannedNodeDecision] = Field(min_length=1)
+
+
 class ScientistPlanDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["plan"]
-    operation: Literal["ndvi", "greenspace", "lst"]
-    next_action: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    task: TaskSpecDecision
+    workflow: WorkflowGraphDecision
+
+
+class ScientistReviseDecision(BaseModel):
+    """A full replacement graph constrained to a local, observed-failure patch."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["revise"]
+    reason: str = Field(min_length=1, max_length=1_000)
+    base_plan_id: str = Field(min_length=1)
+    affected_node_ids: list[str] = Field(min_length=1)
+    task: TaskSpecDecision
+    workflow: WorkflowGraphDecision
 
 
 class ScientistStopDecision(BaseModel):
@@ -111,25 +174,7 @@ class EngineerActionDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["action"]
-    tool_name: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
-    artifact_refs: list[str] = Field(default_factory=list)
-    parameters: dict[str, Any] = Field(default_factory=dict)
-
-    @field_validator("parameters")
-    @classmethod
-    def _parameters_must_not_contain_paths(cls, value: dict[str, Any]) -> dict[str, Any]:
-        def contains_path(candidate: Any) -> bool:
-            if isinstance(candidate, str):
-                return candidate.startswith(("/", "\\\\")) or ":\\" in candidate or ":/" in candidate
-            if isinstance(candidate, dict):
-                return any(contains_path(item) for item in candidate.values())
-            if isinstance(candidate, list):
-                return any(contains_path(item) for item in candidate)
-            return False
-
-        if contains_path(value):
-            raise ValueError("action parameters must be symbolic and must not contain paths")
-        return value
+    node_id: str = Field(pattern=r"^[a-z][a-z0-9_:-]*$")
 
 
 class EngineerHandoffDecision(BaseModel):
@@ -144,10 +189,17 @@ class EngineerStopDecision(BaseModel):
     reason: str = Field(min_length=1, max_length=1_000)
 
 
-class EngineerReviseDecision(BaseModel):
+class ReportDeliverableDecision(BaseModel):
+    """A user-facing output backed by a validated artifact or observation."""
+
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["revise"]
-    next_action: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+
+    deliverable_id: str = Field(pattern=r"^[a-z][a-z0-9_:-]*$")
+    status: Literal["delivered", "partial", "unavailable"]
+    value: float | int | str | None = None
+    unit: str | None = Field(default=None, max_length=100)
+    scope: str | None = Field(default=None, max_length=1_000)
+    artifact_refs: list[str] = Field(default_factory=list)
 
 
 class ReportDecision(BaseModel):
@@ -158,6 +210,7 @@ class ReportDecision(BaseModel):
     kind: Literal["report"]
     summary: str = Field(min_length=1, max_length=10_000)
     artifact_refs: list[str] = Field(default_factory=list)
+    deliverables: list[ReportDeliverableDecision] = Field(default_factory=list)
 
 
 class RunRequest(BaseModel):
@@ -194,6 +247,7 @@ class ArtifactRecord(BaseModel):
     uri: Path
     validated: bool = True
     producer_action_id: str | None = None
+    producer_plan_node_id: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

@@ -44,6 +44,43 @@ class WorkflowGraph:
                 return artifact
         return None
 
+    def node_by_id(self, node_id: str) -> WorkflowNode | None:
+        return next((node for node in self.nodes if node.node_id == node_id), None)
+
+    def predecessor_ids(self, node: WorkflowNode) -> set[str]:
+        """Return explicit and artifact-derived predecessors for one node."""
+        predecessors = set(node.depends_on)
+        for artifact_id in node.inputs.values():
+            artifact = self.artifacts.get(artifact_id)
+            if artifact and artifact.producer_node_id:
+                predecessors.add(artifact.producer_node_id)
+        return predecessors
+
+    def descendant_ids(self, node_id: str) -> set[str]:
+        """Return the affected downstream subgraph, excluding ``node_id`` itself."""
+        descendants: set[str] = set()
+        frontier = {node_id}
+        while frontier:
+            next_frontier = {
+                node.node_id
+                for node in self.nodes
+                if node.node_id not in descendants
+                and self.predecessor_ids(node).intersection(frontier)
+            }
+            descendants.update(next_frontier)
+            frontier = next_frontier
+        descendants.discard(node_id)
+        return descendants
+
+    def eligible_node_ids(self, node_states: dict[str, str]) -> list[str]:
+        """Nodes ready for execution under the runtime-owned state machine."""
+        return [
+            node.node_id
+            for node in self.nodes
+            if node_states.get(node.node_id) == "pending"
+            and all(node_states.get(parent) == "succeeded" for parent in self.predecessor_ids(node))
+        ]
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "workflow_id": self.workflow_id,
