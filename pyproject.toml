@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "expertsrs"
-version = "0.5.2"
+version = "0.5.3"
 description = "Traceable research runtime for user-centric remote sensing analysis"
 requires-python = ">=3.10"
 dependencies = [

@@ -14,6 +14,7 @@ from ExpertsRS.evaluation.ch1.d3_light_loader import load_panel
 from ExpertsRS.evaluation.ch1.d3_light_protocol import build_case_slots
 from ExpertsRS.evaluation.ch1.d3_light_runner import run_unified_d3_case
 from ExpertsRS.evaluation.ch1.v2_evaluator import evaluate_v2_unified_run
+from ExpertsRS.user_agent import RuleProfiledUserAgent, run_one_clarification_loop
 
 
 SCENE = Path(__file__).parent / "data" / "Sentinel2_Dongcheng_20230718.tif"
@@ -38,6 +39,7 @@ class V2CloseoutTests(unittest.TestCase):
         self.assertEqual(planned["view_type"], "planned_workflow_graph")
         self.assertEqual(observed["view_type"], "observed_process_graph")
         self.assertEqual(len(planned["plan_versions"]), 2)
+        self.assertEqual(planned["plan_versions"][-1]["revision_change_class"], "local_reauthorization_only")
         self.assertNotIn(str(SCENE), json.dumps(planned))
         node_ids = {
             node["node_id"]
@@ -119,6 +121,36 @@ class V2CloseoutTests(unittest.TestCase):
             report = result.report or ""
         self.assertEqual(result.status, RunStatus.COMPLETED)
         self.assertIn("vegetation_coverage_map: delivered", report)
+
+    def test_original_request_obligation_rejects_scientist_omission(self):
+        class OmitCoverageProvider:
+            async def decide(self, role, state):
+                if role == "Manager":
+                    return {"kind": "handoff", "target": "Scientist"}
+                if role == "Scientist":
+                    task, workflow = ScriptedDecisionProvider._workflow("greenspace", state["request"])
+                    task["requested_outputs"] = ["green_cover_rate"]
+                    return {"kind": "plan", "task": task, "workflow": workflow}
+                raise AssertionError("Runtime must reject omitted obligation before Engineer")
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run(
+                "Visualize vegetation coverage and calculate green cover rate", Path(directory),
+                system=ExpertsRSSystem(provider=OmitCoverageProvider()),
+            )
+            obligations = json.loads((Path(directory) / "v2" / "delivery_obligations.json").read_text(encoding="utf-8"))
+        self.assertEqual(result.status, RunStatus.CONTROLLED_STOP)
+        self.assertEqual(result.validation.tool_calls, 0)
+        self.assertEqual({item["obligation_id"] for item in obligations["obligations"]}, {"vegetation_coverage_map", "green_cover_rate"})
+
+    def test_rule_profile_clarifies_then_resumes_through_public_api(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            request = RunRequest(request="I want to know the health condition of urban vegetation.", data_paths=[SCENE], output_dir=root, run_id="loop")
+            first, resumed, transcript = asyncio.run(run_one_clarification_loop(ExpertsRSSystem(), request, RuleProfiledUserAgent()))
+        self.assertEqual(first.status, RunStatus.NEEDS_CLARIFICATION)
+        self.assertEqual(resumed.status, RunStatus.COMPLETED)
+        self.assertEqual(transcript["profile"]["turn_limit"], 1)
 
     def test_persisted_provider_state_excludes_thought_events_and_resumes(self):
         class ThoughtStateProvider:

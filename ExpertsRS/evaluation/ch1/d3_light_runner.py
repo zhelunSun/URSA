@@ -600,6 +600,7 @@ async def run_authorized_d3_pilot(
     *,
     panel: dict[str, Any] | None = None,
     system_factory: Any | None = None,
+    continue_on_v1_evaluation_failure: bool = False,
 ) -> list[dict[str, Any]]:
     """Run the reviewed 5-task × 3-condition pilot once in balanced order.
 
@@ -642,6 +643,7 @@ async def run_authorized_d3_pilot(
     (root / "pilot_batch_manifest.json").write_text(json.dumps(batch_manifest, indent=2), encoding="utf-8")
     results = await run_authorized_d3_smoke(
         root, provider_config, slots=selected, panel=panel, system_factory=system_factory,
+        continue_on_v1_evaluation_failure=continue_on_v1_evaluation_failure,
     )
     cases: list[dict[str, Any]] = []
     totals = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "wall_time_seconds": 0.0}

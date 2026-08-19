@@ -53,6 +53,13 @@ def run_v2_scripted_acceptance(destination: str | Path) -> list[Path]:
         ).strip()
     except (OSError, subprocess.CalledProcessError):
         code_commit = None
+    forbidden = ("Thoughtevent", '"thought"', '"reasoning"', '"reasoning_content"')
+    persisted = [path for path in root.rglob("*") if path.is_file() and path.name in {"trace.jsonl", "state.json"}]
+    leak_hits = [str(path.relative_to(root)) for path in persisted if any(token in path.read_text(encoding="utf-8") for token in forbidden)]
+    checksums = {
+        str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(root.rglob("*")) if path.is_file()
+    }
     manifest = {
         "kind": "ch1_v2_scripted_acceptance",
         "protocol_version": V2_PROTOCOL_VERSION,
@@ -70,16 +77,19 @@ def run_v2_scripted_acceptance(destination: str | Path) -> list[Path]:
             "plan_observation_consistent": all(item["plan_observation_consistent"] for item in evaluations),
             "scientist_revision_consistent": all(item["scientist_revision_consistent"] for item in evaluations),
         },
+        "delivery_obligation_closure": all(item["obligation_chain_complete"] for item in evaluations),
+        "privacy_leak_scan": {"passed": not leak_hits, "forbidden_tokens": list(forbidden), "hits": leak_hits},
+        "artifact_sha256": checksums,
         "claim_boundary": {
             "supported": [
                 "v2 planned graph constrains scripted runtime actions",
                 "observed graph can be reconstructed from runtime facts",
                 "report completeness and thought-event persistence checks close in offline acceptance",
             ],
-            "not_supported": [
+        "not_supported": [
                 "live-model reliability or generalization",
                 "scientific or administrative-area correctness of green-cover metrics",
-                "independent checkpoint benefit or stable treatment effect",
+                "independent checkpoint benefit, planning superiority, or stable treatment effect",
             ],
         },
         "overwrite_policy": "never_overwrite",

@@ -97,9 +97,11 @@ class ScriptedDecisionProvider:
             return "lst"
         if any(word in normalized for word in ("green cover", "greenspace", "green space", "vegetation coverage")):
             return "greenspace"
+        if "ndvi" in normalized:
+            return "ndvi"
         if any(word in normalized for word in ("vegetation health", "health condition", "健康")):
             return "clarify_health"
-        if "ndvi" in normalized or "vegetation" in normalized:
+        if "vegetation" in normalized:
             return "ndvi"
         return "clarify_scope"
 
@@ -161,7 +163,7 @@ class ScriptedDecisionProvider:
         task = {
             "task_id": "greenspace_task", "goal": request,
             "expected_outputs": ["metadata", "index_raster", "mask_raster", "map", "area_statistics"],
-            "requested_outputs": ["greenspace_map", "green_cover_rate"],
+            "requested_outputs": ["vegetation_coverage_map", "green_cover_rate"],
             "required_metrics": ["green_cover_rate"],
             "constraints": {"operation": "greenspace"},
         }

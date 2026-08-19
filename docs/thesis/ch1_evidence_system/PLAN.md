@@ -1,8 +1,8 @@
-# 第一章收敛执行计划：方法基线 v1 → 最小真实模型证据
+# 第一章收敛执行计划：冻结 v1 证据 → v2 最小工程闭环 → 开题文本
 
-> 状态：active
-> 决策日期：2026-08-13
-> 所属分支：`codex/ch1-unified-runtime`
+> 状态：active；v1 保持历史冻结证据，v0.5.3 审计缺口收口与最终 v2 5×3 已获授权
+> 决策日期：2026-08-13；最近更新：2026-08-19
+> 所属分支：`codex/ch1-v2-e1-structured-planning`
 > 唯一实现入口：`ExpertsRSSystem.run()` / `.resume()` 与 `python -m ExpertsRS`
 
 ## 1. 本阶段只回答什么
@@ -11,17 +11,25 @@
 **可调整的分层规划、随执行更新的过程图、基于检查点的局部恢复**，在真实工具反馈出现后
 更好地完成、改道、停止和留下可审计证据。
 
-本阶段采用两层完成定义：
+本阶段把两个不同目的明确分开，避免用“毕业时最好达到的完整度”阻塞当前开题：
 
-1. **方法基线 v1**：新增机制已经有唯一运行载体，能够离线演示、检查和重复运行；
-2. **第一章最小实证闭环**：同模型、同工具、同预算下完成小型真实模型对照，并形成结果与
-   失败分析。
+1. **目标 A：开题/九月中旬前的最小闭环**。形成一套结构闭合、可演示、可追溯的系统架构；
+   将已发表 ExpertsRS 的 20-request 人工评审结果作为历史可行性证据；保留 v1 真实模型 matched
+   pilot，并完成一次针对审计缺口的 v2 最小工程收口；若成本允许，再用原 20 条请求形成一轮自动化
+   轻量闭环。目标 A 不要求稳定统计效应、跨模型泛化、逐条新增人工评审或完整用户研究。
+2. **目标 B：毕业论文或新论文级完整验证**。在 held-out 任务和多类故障上隔离结构化规划、
+   observation-driven revision 和 checkpoint recovery 的增量，进行重复实验、外部评分校准、
+   科学/空间结果核验和跨数据泛化。目标 B 是后续研究主线，不是当前开题阻塞项。
 
-第一层是当前检查点，第二层才允许讨论方法效果。系统能运行不等于方法有效。
+截至 2026-08-18，方法基线、真实模型 smoke、首轮 5×3 pilot 和运行包真实性审计已经完成，目标 A
+的证据底座已经形成。审计同时确认：执行控制与审计底盘真实存在，但 live Scientist 目前主要生成
+`operation + next_action`，尚未把完整 `TaskSpec/OperatorSpec/WorkflowGraph` 接入实际决策—执行链；
+process graph 主要由事实事后重建。因此当前优先级不是继续横向扩平台，而是先完成一个有界的 v2
+工程收口，再封存证据、制作图表并写文本。方法/架构文本现在即可起草，最终实验数字在 v2 冻结后落定。
 
 ## 2. 已冻结的架构决定
 
-1. 新系统只有一条权威链：`RunRequest → Manager → Scientist → runtime → Engineer →
+1. 新系统目标只有一条权威链：`RunRequest → Manager → Scientist → runtime → Engineer →
    Executor → observation → revise/continue/stop → Manager report → RunResult`。
 2. Manager、Scientist、Engineer 是模型角色；Executor 是受权限和合同控制的确定性服务。
 3. runtime 独占计划版本、预算、权限、产物、检查点、运行记录和终态；AutoGen 只管理角色
@@ -33,52 +41,85 @@
 6. 第三章只消费 `RunRequest/RunResult/trace/artifact`，gold、评分器和故障注入留在系统外部。
 7. 第一章只承诺运行内的逻辑检查点恢复；进程崩溃后的通用 durable recovery 不进入第一章
    方法 claim，作为跨章节底盘加固另行验收。
+8. v2 必须区分 **Scientist 提出的 planned workflow graph** 与 runtime 根据事件生成的
+   **observed process graph**；前者约束可执行节点，后者只负责审计，二者不得再用同一“规划图”表述。
+9. AI 用户代理只模拟用户 profile、澄清回答和对最终报告的可用性评价；它不生成科学 gold、不替代
+   原论文领域评审，也不得接触 evaluator-private 预期答案。
 
-## 3. 当前证据等级（2026-08-13）
+## 3. 当前证据等级（2026-08-18）
 
 | 项目 | 状态 | 可支持 | 不可支持 |
 | --- | --- | --- | --- |
 | 已发表 ExpertsRS | prior published evidence | 多智能体遥感分析的历史可行性和问题来源 | 新机制效果 |
-| 统一 `run/resume` 链 | engineering support | 新系统已有唯一输入输出载体 | 真实模型可靠性 |
-| 75 项统一测试 | engineering support | 当前软件合同、工具和离线系统路径可复核 | 科学效果或外部有效性 |
+| 统一 `run/resume` 链 | engineering support | 新系统已有唯一输入输出载体和模型—工具—反馈—报告闭环 | 方法效果 |
+| 107 项完整测试、101 项 clean-venv、90% 控制面/evaluator coverage | engineering support | 软件合同、provider、工具和关键失败路径可复核 | 科学效果或外部有效性 |
 | NDVI/澄清/停止/恢复离线场景 | diagnostic evidence | 机制能被真实本地工具贯通 | LLM 自主决策质量 |
 | 5 任务 × 3 条件离线预飞行 | diagnostic evidence | evaluator 已经通过统一 API，三条件可控 | 条件间效果差异 |
-| 真实模型对照 | open | — | 当前禁止声称已通过 |
+| S1–S3 真实模型 smoke | completed integration evidence | 普通完成、故障恢复、模糊需求澄清三条 live 路径可运行 | 稳定性或一般化 |
+| 5×3 真实模型 pilot | 15/15 protocol/evaluator closure | 冻结系统可在有界资源内形成可审计终态；task-11 出现自适应恢复信号 | 稳定机制效应、B3 相对 B2 的增量、科学/空间准确性 |
+| v1 真实性审计 | completed | 15 个 trial 槽位、模型角色调用、工具调用、artifact、trace、plan version、checkpoint 和 observed graph 均有实体证据 | live 完整分层规划已经实现 |
+| pilot outcome 分析 | completed-initial / claim-safe | 唯一故障任务中 B1 停止而 B2/B3 恢复；四个边界任务行为一致 | “规划总体提升”或“checkpoint 已证明更优” |
+| v2 最小工程闭环 | implementation in progress (v0.5.3) | runtime-owned delivery obligations、专题图语义、报告闭合、隔离 UserAgent loop 与新版 evaluator | 最终冻结提交后的 5×3 live 重跑仍待执行 |
+| 科学适用性与主题精度 | open，转交 Ch2/Ch3 | — | 当前第一章不得借系统工件自动声称科学正确 |
 
 因此，当前对外阶段名统一使用：
 
-> **第一章方法基线 v1 已形成，系统达到离线可演示和真实模型实验准备状态；正式效果证据仍开放。**
+> **第一章已形成真实可复核的执行控制与审计底盘，并完成一次真实模型 5×3 集成 pilot。现有结果
+> 提供自适应恢复的初步案例信号；完整结构化规划尚待 v2 接入，checkpoint 的独立收益和一般规划
+> 效果也尚未识别。既有论文的人审证据、v1 工程事实和 v2 最小闭环共同支撑开题可行性，但不足以
+> 升级为稳定效果结论。**
 
 ## 4. 当前检查点的验收标志
 
-以下条件同时满足时，本轮架构整合结束，不再继续横向扩建：
+以下 v1 条件已经满足并冻结，不因 v2 修改而回写历史工件：
 
 - `codex/ch1-unified-runtime` 明确从 `codex/ch1-baseline-20260811` 分出，历史 notebook 未改；
 - 新系统只有一个 `run/resume` 权威入口；
-- 标准命令 `python -m unittest discover -s ExpertsRS -v` 返回 0（当前 75 项）；
+- 完整测试 107 项通过，clean virtual environment 中 101 项 unittest 通过，控制面/evaluator
+  branch-aware coverage 为 90%（门槛 85%）；
 - CLI 可离线生成真实 NDVI 栅格、地图、报告、`state.json`、`trace.jsonl` 和 `result.json`；
 - 澄清、科学前置条件停止、目录越界拒绝、故障后计划修订与检查点复用有显式测试；
 - D3 evaluator 只注入条件和读取轨迹，不再替 Agent 预排角色或动作；
-- 已明确记录 live、科学正确性、耐久恢复和 18 工具完整 Agent 可达性等未通过项。
+- S1–S3 live smoke 和 5×3 live pilot 已在冻结配置上运行并保留不可覆盖工件；
+- 已明确记录科学正确性、稳定机制效应、耐久恢复和 18 工具完整 Agent 可达性等未通过项。
 
-这些条件目前已经满足。该检查点叫“方法基线 v1”，不叫“第一章实验完成”或“系统整体通过”。
+这些条件目前已经满足。当前可以称“方法基线 v1 + 真实模型集成 pilot + 真实性审计完成”，也可以
+称“第一章开题级证据底座完成”；仍不能称“完整结构化规划已进入 live 链”“方法效果已充分证明”
+或“系统整体通过”。v2 的停止条件另列在第 5 节，只修复影响架构叙事和轻量复验可信度的缺口。
 
 ## 5. Workhorse 执行看板
 
 ### 5.0 调度规则
 
-当前可以与“大版本和科学故事冻结”并行启动工程修复，但**核心代码一次只允许一个 writer**。
-`models.py / decisions.py / system.py` 是高冲突文件；让多个 workhorse 同时修改它们，节省的时间
-会被接口漂移和合并返工抵消。
+WP1–WP4a、S1–S3、E1 5×3 和真实性审计已完成。第一章现在采用“v2 有界修复与文本并行”的节奏；
+不等待新论文级实验才写作，也不把审计确认的架构缺口留到最终系统图之后。核心代码一次只允许一个
+writer，任何新实验不得回写或覆盖冻结的 v1 pilot。
 
-推荐两条并行泳道：
+截至 2026-08-18 的执行状态：
 
-| 泳道 | 当前工作 | 可否立即开始 | 写入范围 |
-| --- | --- | --- | --- |
-| A：研究冻结 | 大版本、C1 claim、实验条件和披露边界的人类/Sol 审查 | 是 | 论文总控 proposal、研究文档；不改 runtime |
-| B：系统修复 | `WP1 → WP2 → WP3 → WP4a` 严格串行合入 | 是，从 WP1 开始 | ExpertsRS 新主线；不改科学故事和 evaluator gold |
-| C：预备分析 | WP4a 测试矩阵/coverage 缺口只读审查 | 可与 WP1 并行 | 只交报告，不提交代码；WP1 合入后再实现 |
-| D：后续底盘 | WP4b、WP5 | live 轻量实验后或空档进行 | 不得反向改变已冻结实验 commit |
+| 工作包 | 状态 | 当前证据/决定 |
+| --- | --- | --- |
+| WP1 typed action contract | completed | 模型只提交符号动作，runtime 绑定参数、权限和真实工具 |
+| WP2 live provider/identity | completed | offline/live 身份、provider 失败和用量记录显式化 |
+| WP3 Manager report | completed | live/offline 共用结构化报告与 artifact 引用验证 |
+| WP4a live gate | completed | 107 tests、clean-venv 101、90% coverage、泄漏与失败门槛通过 |
+| S1–S3 live smoke | completed | Paratera `DeepSeek-V4-Flash` 三条固定路径通过；早期失败单独保留 |
+| E1 5×3 live pilot | completed | 15/15 protocol/evaluator closure，166,400 tokens，346.7 s |
+| E1 运行包人工检查 | completed（研究者确认） | 数据、产物和运行包已核验；不再安排笼统的重复人工复核 |
+| E1 真实性与 claim 审计 | completed | 107 tests 重跑通过；真实 role/tool/artifact/trace/graph 已计数；live plan、report closure、state 脱敏缺口已定位 |
+| V2-E1 live 规划闭环 | completed in v0.5.2; audited in v0.5.3 | 结构化多步计划接入 live；计划节点约束执行；失败回到 Scientist 修订；区分 planned/observed graph |
+| V2-E2 报告与隐私闭环 | completed in v0.5.2; strengthened in v0.5.3 | 原始请求独立义务、task-11 专题图/比例语义、state 去除 ThoughtEvent、修正 revision actor attribution |
+| V2-E3 验收与最终复验 | running，P0 | 新离线 manifest、rule/live UserAgent smoke、最终 v2 5×3；20×1 取消 |
+| 开题证据包与文本 | in progress | 架构/方法可立即写；最终结果表在 v2 复验后冻结；不需要 45-run 或完整用户研究 |
+| WP4b / WP5 | deferred / optional | 非开题阻塞；只在不挤占写作或跨章接口确有需要时启动 |
+
+当前推荐三条泳道：
+
+| 泳道 | 当前工作 | 优先级 | 写入范围 |
+| --- | --- | ---: | --- |
+| A：v2 工程收口 | 完整计划接入、Scientist 修订、报告闭合、state 脱敏、强化 evaluator | P0 | 核心代码与测试；不覆盖 frozen runs |
+| B：开题文本 | 架构/方法先写；既有成果映射、实验和限制随 v2 结果更新 | P0 | 论文/开题文档 |
+| C：轻量复验 | 3 条 smoke、必要时 v2 5×3、可选原 20-request × 1 条件 | P1 | 新协议/新 run 目录；低成本自动评分 + 人工抽查 |
 
 分支和合入规则：
 
@@ -93,15 +134,55 @@
 
 | 顺序 | 包 | 阻塞关系 | 主要允许文件 | 合入产物 |
 | ---: | --- | --- | --- | --- |
-| 1 | WP1 动作合同 | 无；现在开始 | `models.py`、`decisions.py`、`system.py`、对应新测试 | typed decisions + runtime/tool binding |
-| 2 | WP2 live provider | WP1 | 新 `provider`/config 模块、`__main__.py`、必要的上述核心文件、对应测试 | 显式 offline/live 身份和失败语义 |
-| 3 | WP3 Manager 报告 | WP2 | 核心文件、报告测试 | 同一报告合同和 artifact 引用校验 |
-| 4 | WP4a live gate | WP3 | 测试、coverage 配置、最小缺陷修复 | critical edge tests、clean venv、≥85% 控制面覆盖 |
-| 5 | S1–S3 live smoke | WP4a + 人类开门 | 只写不可覆盖 run 目录 | 3 个真实模型 smoke 工件 |
-| 6 | E1 轻量 5×3 | S1–S3 全通过 + 协议冻结 | 只写不可覆盖实验目录 | 15 个 trial + 外部评分 + anomaly memo |
-| 7 | WP4b / WP5 | 不改变 E1 冻结版本 | 非实验主线加固 | 跨进程恢复、更多鲁棒性与跨章端口 |
+| 1 | WP1 动作合同 | completed | `models.py`、`decisions.py`、`system.py`、对应新测试 | typed decisions + runtime/tool binding |
+| 2 | WP2 live provider | completed | provider/config、CLI、核心文件与测试 | 显式 offline/live 身份和失败语义 |
+| 3 | WP3 Manager 报告 | completed | 核心文件、报告测试 | 同一报告合同和 artifact 引用校验 |
+| 4 | WP4a live gate | completed | 测试、coverage、最小缺陷修复 | critical edge tests、clean venv、90% 控制面/evaluator coverage |
+| 5 | S1–S3 live smoke | completed | 不可覆盖 run 目录 | 3 个真实模型 smoke 工件与 anomaly memo |
+| 6 | E1 轻量 5×3 | completed | 不可覆盖实验目录 | 15 个 trial、程序化外部评分和批次汇总 |
+| 7 | E1 truth/claim audit | completed | 文档、只读结果分析 | 真实运行计数、过度 claim 修正、v2 缺口清单 |
+| 8 | V2-E1 structured live planning | current P0 | `models.py`、`decisions.py`、`system.py`、graph/validator 与测试 | planned graph 约束真实执行，失败由 Scientist 修订 |
+| 9 | V2-E2 report/privacy hardening | P0 after V2-E1 | report/state persistence/trace 与测试 | 请求指标必须交付或显式 partial；持久化不含 ThoughtEvent |
+| 10 | V2-E3 acceptance/replay | P0/P1 after V2-E2 | tests、evaluator、新 run 目录 | 离线全绿、3 smoke；按行为变化决定 5×3/20×1 |
+| 11 | WP4b / WP5 / repeated study | deferred | 不改变 E1 冻结版本 | 毕业/论文级增强，不阻塞开题写作 |
 
-下面的每个包都是一个独立 workhorse 聊天的最大范围。
+下面保留 WP1–WP5 的验收合同作为实现历史和后续维护边界；WP1–WP4a 已完成，不按旧顺序重新执行。
+下一位工程模型只领取 V2-E1，再顺序进入 V2-E2/V2-E3，不得把 WP4b/WP5 或跨章功能夹带进来。
+
+### V2-E1：把结构化多步规划接入 live 链（当前 P0）
+
+- Scientist 输出可验证的 `TaskSpec / OperatorSpec / WorkflowGraph`，而非仅保存
+  `operation + next_action`；runtime 拒绝无依赖、类型、输入或可执行条件的非法计划；
+- Engineer 只能执行 planned graph 中当前 eligible 的节点，工具 observation 必须回写对应节点状态；
+- 工具失败或关键 observation 交回 Scientist 形成带原因、actor 和 patch 的 `PlanVersion + 1`；不得由
+  runtime 把 Engineer 的 `revise` 自动记成 Scientist 决策；
+- 分开导出 planned workflow graph 和 observed process graph，并建立 plan node ↔ action/event/artifact
+  的稳定引用；
+- 只扩充原 20-request 轻量复验所必需且已有安全参数绑定的工具；不以暴露全部 18 个工具为目标。
+
+验收：新增多步计划 schema/validator、eligible-node enforcement、失败回到 Scientist、局部 patch、
+planned/observed graph 对齐和 actor attribution 测试；现有 107 项回归继续通过。
+
+### V2-E2：报告闭合与持久化隐私（P0）
+
+- Manager 报告必须回答用户明确要求的数值、比率和 artifact；如果 denominator/AOI 语义未验证，必须
+  报告限定口径或 `partial`，不能一边已有结果一边声称“未计算”，也不能无条件 `completed`；
+- evaluator 增加 user-requested-output completeness、plan/action consistency、revision trigger、
+  graph reference 和 false-success 检查；协议 PASS 与结果正确率分开；
+- `trace.jsonl` 与可移植 `state.json` 均不得持久化 ThoughtEvent/chain-of-thought，只保留结构化决定、
+  必要 observation、用量和可审计 provenance。
+
+验收：task-11 比率/分母口径测试、缺请求输出时 partial/stop 测试、state/trace 泄漏测试和严格 evaluator
+反例全部通过。
+
+### V2-E3：无 API 验收与低成本复验（P0/P1）
+
+1. 先运行全部单元/集成测试、clean environment、CLI、`compileall`、泄漏检查和 scripted 15-slot；
+2. 通过后只授权 3 条 live smoke：普通多步完成、失败后 Scientist 修订、需要用户澄清；
+3. 若 V2-E1/E2 改变规划、报告或终态语义，则 v1 结果继续标为历史 v1，并用新目录重跑 v2 5×3；
+4. 若预算允许，再以**原论文 20 条精确请求 × v2 最终系统单条件**做 breadth closure；不把它包装为
+   新 matched study，不要求每条件重复，也不追求发表级统计功效；
+5. 20×1 默认程序评分 + AI 用户代理 + 风险抽样人工复核，细则见 6.4；不得让 AI 用户代理读取 gold。
 
 ### WP1：收紧模型动作合同（P0，阻塞 live）
 
@@ -178,127 +259,200 @@ WP4b 不得在 E1 运行中修改被冻结的实验 commit。若 E1 已开始，
 非目标：Web/API 服务、UI、多租户、企业 IAM、分布式队列、自动下载数据、MCTS/LangGraph、
 长期记忆、Agent RL、增加角色或扩大工具集合。
 
-## 6. 真实模型实验何时可以开始
+## 6. 真实模型实验状态、判读与双目标路线
 
-### 6.1 现在可以做什么
+### 6.1 已完成的运行
 
-- 15 槽 scripted/offline 预飞行现在已经可以重复运行；它只用于检查协议和 evaluator；
-- 可以立即开始 WP1，同时由高阶模型继续冻结大版本、C1 claim 和跨章边界；
-- 不应现在直接运行 live 5×3，因为当前 CLI 仍默认 scripted，模型动作尚未完整类型化，最终报告
-  仍是 runtime 固定句，provider 异常和关键预算分支也未形成完整实验级证据。
+2026-08-14，Paratera `DeepSeek-V4-Flash` 在冻结 runtime/prompt commit `2aeecd3` 上完成一次
+5 任务 × 3 条件的 live pilot；runner 审计基线为 `30c8075`。15/15 槽位完成并通过程序化外部
+evaluator，总用量 166,400 tokens、总 wall time 346.7 s；API gate 随后关闭。此前 SiliconFlow
+超时、Paratera 协议适配和早期 pilot 失败全部保留为 anomaly，不并入最终成功批次。
 
-### 6.2 Gate L0：允许三次 live smoke
+| 条件 | evaluator PASS | 真实终态 | tokens | wall time |
+| --- | ---: | --- | ---: | ---: |
+| C1-B1 static | 5/5 | 1 completed、3 controlled stop、1 clarification | 31,228 | 76.6 s |
+| C1-B2 adaptive | 5/5 | 2 completed、2 controlled stop、1 clarification | 66,365 | 137.5 s |
+| C1-B3 checkpoint | 5/5 | 2 completed、2 controlled stop、1 clarification | 68,807 | 132.7 s |
 
-只有以下检查全部为 PASS，研究者才打开 API 双门禁：
+这里的 PASS 是**协议闭合**：运行到达该任务/条件允许的终态，留下要求的 artifact/trace/graph
+证据。它不等于 15 个任务全部成功，更不等于主题精度或方法效应为 100%。
 
-- [x] WP1、WP2、WP3、WP4a 已按顺序合入，L0 冻结提交前工作树已核对；
-- [x] 统一测试、`compileall`、`git diff --check` 和控制面/evaluator ≥85% coverage 通过；
-- [x] clean venv 安装和同一 CLI/Python API 离线运行通过；
-- [x] `execution_mode=autogen-live`、provider、model、prompt/panel/code hash 和预算进入 manifest；
-- [x] temperature=0、cache off、provider/tool retry=0、timeout 和 token/turn/tool 上限已冻结；
-- [x] agent view 泄漏测试通过；API key 仅存在于未跟踪环境变量；
-- [x] live runner 调用统一 `ExpertsRSSystem`，代码中不再保留主动阻断；
-- [x] 研究者批准模型、15-run 保守支出上限、文本外发边界和三次 smoke 双门禁（2026-08-14）。
+### 6.2 当前可以和不可以得出的结论
 
-达到 L0 后只运行三次固定 smoke，不自动续跑：
+五个任务中，task-02 是正常 NDVI 完成，task-03 是缺工具停止，task-10 是缺热红外前置条件停止，
+task-13 是指标定义澄清；这四个任务的三条件终态一致，主要验证系统边界和诚实闭合。只有 task-11
+注入一次 threshold 写入失败并对恢复机制敏感：B1 在失败后受控停止，B2/B3 均形成 plan v2 并完成
+后续 mask、map 和 area statistics。因此当前支持一个窄结论：
 
-> 2026-08-14 阶段结果：S1 已在冻结 live 路径通过；S2 的恢复合同、预算与时限缺口已通过保留失败
-> 运行逐项暴露并修复，但最终冻结轮遇到 SiliconFlow 单次请求超时；S3 未运行。本地 API gate 已重新
-> 关闭，L1（15-case pilot）判定为 NO-GO。随后已明确审查 Paratera 的 `DeepSeek-V4-Flash` 可用性，
-> 并在 commit `a4006dc` 从头完成 S1-S3（均 PASS）。运行包审查完成后，研究者已授权一轮 15-case
-> pilot；它使用单独的 `pilot_authorized` panel gate、Paratera 的同一模型和不可覆盖的批次汇总。此前
-> SiliconFlow 结果仍作为保留的 provider-stability anomaly。
+> 在一个受控的多步工具故障案例中，允许 observation-driven revision 的系统能够从失败后继续，
+> 静态条件按合同停止；完整故障、修订和 artifact 轨迹可重建。
 
-> 2026-08-14 完成记录：Paratera `DeepSeek-V4-Flash` 已在冻结 pilot 中完成 15/15 evaluator PASS，
-> 详见 `paratera_pilot_result_20260814.md`。这完成真实模型集成与运行证据闭环，但不自动升级为方法
-> 效果或科学准确性结论；下一步是外部 outcome 分析与 claim-safe 结果备忘。
+当前不能声称 checkpoint 已证明比普通自适应复用更优。task-11 的 B2/B3 都是 12 model turns、
+7 tool calls、1 次 NDVI，实际工具序列相同；B3 增加了 checkpoint 和 `restart_from_checkpoint_id`
+证据，但没有在本例中减少重算。B3 相比 B2 多 1,668 tokens，单次 wall time 反而短约 8 s，这些
+单次描述量不能解释为稳定成本效应。
 
-| Smoke | 场景 | 必须观察到 |
-| --- | --- | --- |
-| S1 | 普通 NDVI | completed、真实 raster/map、有效报告、完整 trace |
-| S2 | 绿地覆盖故障恢复 | 失败可见、计划 v2、有效 checkpoint 复用、无重复 NDVI |
-| S3 | “植被健康情况” | needs_clarification，同 run ID 恢复后继续 |
+另一个必须显式保留的反例是：task-11 的 B2/B3 报告均说“green cover rate 未计算”，但 runtime
+标为 `completed`，程序 evaluator 仍判 PASS。mask metadata 中存在相对有效像元的 40.76%，但当前
+没有在第一章证明该分母严格等于行政区面积，也没有把该比率交付到最终报告。因此开题表格应把
+这两例写为“运行/恢复闭合，用户目标闭合有保留”，而不是把它们宣传为无条件完整成功。
 
-### 6.3 Gate L1：允许轻量 5 任务 × 3 条件
+### 6.3 系统完善、实验与科学证据的关系
 
-三次 smoke 全部达到预期终态后，先人工/Sol 检查一次运行包。以下任一项失败即 NO-GO：静默重试、
-换模型/换样本、路径或 gold 泄漏、成本记录缺失、虚假成功、产物不可打开、trace 无法重建、条件
-除了 capability policy 之外存在差异。
+| 层次 | 回答的问题 | 当前状态 | 对开题的作用 | 对完整论文仍缺什么 |
+| --- | --- | --- | --- | --- |
+| 系统架构/工程证据 | 方法对象是否有唯一可运行载体、失败是否可见、证据是否可追溯 | 执行/审计较完整；完整 live 规划仍待 v2 | 支撑“研究可实施”和方法章节主体 | v2 planned graph 执行约束、Scientist 修订、报告/隐私闭合 |
+| 第一章机制实验 | 新机制是否在匹配条件下改变规划/恢复行为 | 初步；一个自适应恢复信号，B3 独立增量未识别 | 作为 preliminary result 足够，必须限制 claim | held-out 多故障、真正能区分 B2/B3 的任务、重复与效应量 |
+| 科学/空间结果证据 | 所选指标、阈值、区域和输出是否科学有效、空间准确 | 第一章刻意不评分；部分前置条件 fail closed | 通过边界说明避免过度主张 | Ch2 科学约束实验、Ch3 空间/任务结果 grader 和外部校准 |
+| 已发表 ExpertsRS 证据 | 早期多智能体遥感系统是否可行、原问题从何而来 | 已有论文与 20-request 历史结果 | 可复用为 prior evidence 和演化起点 | 不能重标为当前机制的 matched effect |
 
-L1 通过后可以开始 15 个 live trial。**不需要等待 WP5、第二章知识库完成或第三章评测框架完成**；
-但必须在一个冻结 commit 上一次性运行，途中不得修代码。遇到异常保留原 run，停止批次，形成
-anomaly memo，决定修复后整批重跑还是把失败作为结果；不得删除失败并补样本。
+系统成熟度是实验可信的必要底座，但不能替代机制效果；科学正确性又是另一层，不能由“工具成功”
+自动推出。对开题，四层证据可以组合成“已有成果 → 明确问题 → 新架构 → 初步真实模型信号 →
+后续可证伪计划”的完整故事。对新论文或毕业终稿，则必须补第二、三层的独立证据。
 
-### 6.4 现实的最早启动点
+### 6.4 人工审核发生在哪一环，而不是“每次运行都人工盯着”
 
-从依赖而不是日历判断，live smoke 最早位于 `WP1 → WP2 → WP3 → WP4a` 四个合入检查点之后；
-轻量 5×3 最早位于三次 smoke 的人工审查之后。若每个包边界稳定，通常可压缩为 **4 个顺序
-workhorse 实现/验收聊天 + 1 个高阶审查聊天**。大版本与科学故事冻结可以全程并行，不需要等其
-所有文字定稿；只需在 L0 前冻结 C1 claim、条件、指标和披露边界。
+原论文的 20-request 实验已经包含领域研究者对规划过程和最终结果的人工评审，这部分继续作为已发表
+历史证据，不需要为了扩充本章原样重做。当前应把三种容易混淆的人工工作分开：
 
-以 2026-08-13 为计划起点，若 provider 兼容性没有产生新 P0 问题，建议把 **2026-08-16 至
-2026-08-18** 作为三次 live smoke 和随后 15-run 的最早目标窗口，而不是承诺日期。若 L0/L1
-任一门槛未通过，日期自动后移，不通过删测试、减披露检查或跳过 smoke 来追日期。
+| 环节 | 审核对象 | 本章默认做法 | 是否要求每条运行人工介入 |
+| --- | --- | --- | --- |
+| 运行前 gold/rubric 冻结 | 请求预期是执行、澄清还是停止；关键步骤、必需输出和科学边界 | 优先复用原 20 条请求及既有评审口径；新增/改变标签时由研究者一次性批准 | 否；这是数据集/评分合同审核，不是运行时操作 |
+| 运行中用户交互 | 系统提出澄清问题后用户如何回答，以及不同用户 profile 的偏好 | 用隔离的 AI UserAgent 批量模拟；固定 profile、seed、预算和对话合同 | 否；只对少量异常交互抽查 |
+| 运行后结果评价 | plan/result/report 是否正确、完整、可用 | 确定性 grader + AI judge 双轨；对失败、partial、grader 分歧和随机样本做人审 | 否；不要求研究者逐条看全部成功样本 |
+| 学术结论与科学标签 | 指标/分母是否成立、claim 是否越界 | 研究者最终裁决 | 是，但只裁决少量有争议项，不参与每次工具调用 |
 
-### 6.5 实验步骤
+AI UserAgent 的 profile 至少冻结：遥感熟悉度、任务目的、可接受输出、澄清耐心、是否能提供缺失信息。
+它只能看到与真实用户相同的请求、系统问题、报告和 artifact 摘要；不能看到 gold、故障注入 ledger、
+隐藏 rubric 或系统内部计划答案。它可评价“是否回答了我、是否需要继续澄清、报告是否可理解”，但
+不能裁定 NDVI/阈值/行政区分母的科学正确性。
 
-1. 冻结模型、prompt/hash、代码 commit、数据、预算、披露边界和失败策略；
-2. 只跑三次 smoke：普通 NDVI、故障恢复、模糊需求澄清；任一失败先分析，不替换样本；
-3. smoke 通过后运行 5 任务 × 3 条件的最小对照；
-4. 分开报告任务闭合、正确改道、错误成功报告、恢复范围、轨迹完整性和成本；
-5. 形成 claim-safe 结果备忘：支持什么、反例是什么、是否保留/收窄/拒绝 C1。
+目标 A 采用低成本风险抽样：程序与 AI judge 一致且明确成功的样本无需逐条人审；人工只看
+`all failures + all partial/clarification + all grader disagreements + 至少 20% 的其余样本`。若 20×1
+只有 20 条，这通常约为 4 条随机成功样本加全部异常项，而不是重新人工运行 20 次。只有当论文要把
+该实验升级为新的独立效果证据时，才恢复盲评、双评审/一致性和逐条标签校准。
 
-首轮 15-run 是单次 matched pilot，用于获得最小机制信号和发现失败模式，不承担稳定统计效应
-声明。首轮结束前不授权 45-run 重复；只有运行完整、评分有区分度、成本可接受且未发现泄漏或
-系统性 provider 失败时，才另行决定是否重复。
+因此，当前所谓人工复核主要是**运行前评分口径的一次性批准和运行后的风险抽查**，不是数据制作、
+不是让人替 Agent 点工具，也不是要求系统运行时每条都有人在环。研究者已经完成的 v1 运行包检查不
+重复；task-11 按“恢复完成但用户结果交付有保留”冻结，v2 用报告校验修复该类问题。
+
+### 6.5 目标 A：九月中旬前的开题级路线（当前 P0）
+
+目标 A 不以 45-run、跨模型或完整用户研究为前置条件。文本工作现在开始；v2 只修复会影响“完整
+系统架构”和轻量复验真实性的 P0 缺口，不扩展为新论文工程。
+
+| 时间窗 | 工作 | 责任 | 完成标志 |
+| --- | --- | --- | --- |
+| 8 月 18–20 日 | 冻结 v1 真实性审计、claim-safe 口径和本计划 | AI 完成；研究者确认目标边界 | v1 事实表、反例、允许/禁止 claim、v2 工程任务书 |
+| 8 月 20–27 日 | 顺序实施 V2-E1/E2；补测试与 evaluator；同时起草架构和方法文字 | 工程模型完成代码；研究者无需逐条参与 | live structured plan、Scientist revision、report/privacy tests 全绿 |
+| 8 月 27–31 日 | V2-E3 无 API 验收和 3 条 live smoke；按行为变化决定是否重跑 v2 5×3 | AI 执行；新 API 仅需一次预算授权 | v2 acceptance manifest；必要时新 15-run 包 |
+| 9 月 1–4 日 | 若成本允许，运行原 20-request × 1 最终条件；程序/AI 双评并做风险抽样 | AI 批跑与评分；研究者只看异常和抽样 | 轻量 planning/result/report closure 表；不宣称新论文级效应 |
+| 9 月 1–10 日 | 制作图表、证据索引，写第一章系统、实验、结果和限制 | AI 起草；研究者按论文观点修改 | 第一章连续文本 v0.1 |
+| 9 月 11–15 日 | 与总开题结构合并，压缩创新点，做全局一致性审查 | AI 整理；研究者最终定稿 | 开题级第一章包和答辩口径 |
+
+20×1 是“有余力则做”的 breadth closure，不是开题写作 Gate。若 v2 工程或 smoke 延误，优先保住
+系统闭环、3 条 smoke、v1 证据和文本；取消 20×1，而不是压缩写作或偷偷降低验收门槛。
+
+### 6.6 目标 B：仅供毕业终稿参考的“漂亮实验”路线（当前 deferred）
+
+当前最主要的论文级缺口确实不是系统架构，而是**增量机制对规划与恢复的帮助尚未被充分识别**。
+用户当前不计划把本章另投一篇小论文，因此下列工作不进入九月前队列，也不交给下一位工程模型。
+只有毕业终稿需要更强因果证据、或未来明确改变发表目标时，才按以下顺序做：
+
+1. **重新建立可归因的基线。** 当前 B1 已包含结构化任务、validator 和 controlled stop，无法检验
+   “结构化表示/验证相对自由规划”的增量。新协议应增加 direct/free-form 或旧系统 matched baseline，
+   或恢复经审查的 P0–P3 累加式消融，同时保留当前 B1–B3 作为恢复机制子实验。
+2. **扩大真正有区分度的 held-out 故障集。** 至少覆盖 3–5 类多步故障：下游瞬时失败、上游 artifact
+   失效必须重算、checkpoint 前后不同故障、错误替代工具、预算临界和用户澄清后恢复。不能继续只靠
+   task-11 一个 threshold fixture。
+3. **让 B2/B3 产生可观察差异。** 设计只有 checkpoint 才能安全复用或恢复的场景，并报告重复工具数、
+   受影响子图 edit size、恢复距离、无效 artifact 拒绝、tokens、wall time 和错误成功率。
+4. **加强独立评分。** 将 plan/action consistency、revision trigger、subgraph locality、report closure 和
+   graph semantics 变成可执行 rubric；程序 grader 与盲评人工/领域评审做抽样校准，报告分歧而非只报
+   一个 PASS。
+5. **先 held-out，再重复。** 面板和评分冻结后再做每条件 3 次或更多重复；45-run 只有在任务本身有
+   区分度时才有意义。报告配对效应量、置信区间、失败类型和成本，不用温度 0 代替重复性。
+6. **补外部有效性。** 增加至少一个新区域/影像、另一模型或 provider，并把科学指标/空间结果正确性
+   放到 Ch2/Ch3 独立评价；必要时加入专家或目标用户校准。
+7. **形成新论文叙事。** 从“又一个多 Agent 系统”提升为“遥感工作流中可验证的规划—反馈—局部恢复
+   方法”，用旧 ExpertsRS 说明问题与历史基线，用新 matched study 证明增量，用跨章实验说明科学和
+   系统外部效度。
+
+这条路线只作为研究储备。开题可以说明其设计和可执行性，但不承诺完成 45-run、跨模型、完整人工
+盲评或新用户研究；当前章节依靠已发表 20-request 人审证据、新系统架构和 v1/v2 初步运行闭合即可。
+
+### 6.7 冻结命名与历史边界
 
 现有冻结 JSON 保留 `B1_static/B2_adaptive/B3_checkpoint`，避免无审批重写历史工件；新汇报和新
 manifest 一律加章节前缀写作 `C1-B1/C1-B2/C1-B3`，与第二章 B0–B5 区分。已发表/旧 StateFlow
-只作历史参照，不伪装为相同条件下的 matched arm。若要正式改 ID，须由研究者批准并新建协议版本。
+只作历史参照，不伪装为相同条件下的 matched arm。若要增加 P0–P3 或 held-out panel，必须建立新
+协议版本，不得修改、删除或覆盖本轮 15-run。
 
-## 7. 停止规则与跨章移交
+## 7. 当前停止规则与跨章移交
 
-- WP1–WP4a 只完成 live 所需最小加固；出现新平台需求一律进入 backlog；
-- 5×3 最小对照完成并形成 claim-safe 备忘后，第一章回到 P1 维护，主投入恢复到第二章 P0；
-- 第二章可以现在开始设计 adapter，但在 WP1/WP2 冻结前不进行依赖该底盘的正式实验；
-- 第三章可以复用任务/轨迹草案，但在 WP4a、三次 live smoke 和接口版本冻结前，不把本底盘称为
-  “真实环境稳定评测平台”。
+- 第一章目标 A 只允许新增隔离的 AI UserAgent 测试夹具，不新增常驻用户 Agent、平台、durable
+  runtime 或 UI；
+- V2-E1/E2、无 API 验收、3 条 smoke、claim-safe memo、图表、证据索引和章节初稿完成后，第一章
+  进入 P1 维护；20×1 可因进度取消，不影响开题 Gate；
+- 完成 v2 后，只有两类问题允许在写作期重开核心代码：影响已报告事实的可复现缺陷，或明确阻塞
+  跨章接口的缺陷；
+- 新 held-out/重复实验属于目标 B，必须使用新协议、保留当前 pilot、冻结评分后再授权 API；
+- 第二章现在可以继续知识/contract admission；第三章可以继续外部 evaluator 准备，但不得用第一章
+  15/15 protocol PASS 代替科学正确性、空间准确性或用户效果；
+- 若时间与写作冲突，优先级固定为：**v2 P0 真实性缺陷 + 文本 > 3 条 smoke > 可选 20×1 > 新论文级
+  实验 > 平台增强**。
 
 ## 8. 每个 workhorse 聊天的固定交付格式
 
-每个任务只领取一个 `WPn`，并在交付中写明：修改文件、未触碰边界、测试命令与结果、生成工件、
-尚未覆盖的反例、当前 commit。禁止根据聊天内容自行升级 claim、改变实验条件或修改 legacy notebook。
+每个实现或分析任务只领取一个有界工作包（`WPn` 或第 9 节 `Task n`），并在交付中写明：修改文件、
+未触碰边界、测试/分析命令与结果、生成工件、尚未覆盖的反例、当前 commit。禁止根据聊天内容自行
+升级 claim、改变冻结实验条件、覆盖 run 或修改 legacy notebook。
 
 建议给每个 workhorse 的开头固定为：
 
 > 读取 `docs/thesis/ch1_evidence_system/AGENT_HANDOFF.md`、`PLAN.md` 和
-> `UNIFIED_RUNTIME_REVIEW_PACKET.md`。你只执行 WPn；先核对最新基线和工作树，严格遵守允许文件、
-> 非目标、验收和证据边界。不要调用真实 API，不修改 legacy notebook、实验 panel/gold 或论文 claim。
-> 完成后运行规定检查，提交独立 commit，并按 PLAN 第 8 节格式交接。
+> `UNIFIED_RUNTIME_REVIEW_PACKET.md`。你只执行指定 WPn/Task；先核对最新基线和工作树，严格遵守允许
+> 文件、非目标、验收和证据边界。不要未经批准调用真实 API，不修改 legacy notebook 或冻结的
+> 实验 panel/gold/run。完成后运行规定检查；若产生代码/文档修改则提交独立 commit，并按 PLAN
+> 第 8 节格式交接。
 
-## 9. 现在就可以发出的三个聊天任务
+## 9. 给下一位工程模型的开工顺序
 
-### Chat A：高阶模型 / 科学冻结
+### Task 1：V2-E1 structured live planning（当前唯一代码 P0）
 
-> 审查第一章 C1 的问题—方法对象—条件—指标—允许 claim 是否闭合。重点裁决
-> `C1-B1/C1-B2/C1-B3` 条件命名、15-run 作为最小 pilot 是否足够，以及 live 披露边界。
-> 只形成 proposal/批复，不改 runtime、panel、gold 或历史 notebook。
+> 先只实现第 5 节 V2-E1：将已有 typed workflow kernel 接入 `ExpertsRSSystem.run()/resume()`，让
+> Scientist 产生并修订完整多步计划，Engineer 只能执行 eligible node；分开 planned/observed graph，
+> 修正 revision actor。不得扩平台、改 legacy notebook、覆盖 v1 runs、接真实 API 或顺手做跨章端口。
+> 完成后提交测试、迁移影响和“旧 15-run 为何仍只能叫 v1”的说明，再领取 Task 2。
 
-### Chat B：workhorse / WP1（唯一核心代码 writer）
+### Task 2：V2-E2 report/privacy/evaluator（Task 1 通过后）
 
-> 读取 `AGENT_HANDOFF.md`、`PLAN.md`、`UNIFIED_RUNTIME_REVIEW_PACKET.md`，只执行 WP1。
-> 建立 typed role decisions 和 agent-visible ToolBinding 安全子集，runtime 独占路径解析、权限和
-> 执行。解决非法 JSON、未知工具/参数/artifact 和重复失败终态；不接 API、不做报告闭环、不改
-> evaluator、panel/gold、论文 claim 或 legacy notebook。完成统一测试、compileall、diff check，
-> 提交独立 commit 并给出证据边界。
+> 修复用户请求输出闭合、partial/false-success 语义、`state.json` ThoughtEvent 脱敏和严格 evaluator。
+> 用 task-11 的 40.76% 反例做回归：报告必须给出“有效影像像元范围内”限定，除非另有 AOI 证据；
+> 不得把该数值直接重命名为行政区覆盖率。全部旧测试和新增反例必须通过。
 
-### Chat C：workhorse / WP4a 只读测试审计
+### Task 3：V2-E3 offline acceptance（Task 2 通过后，无 API）
 
-> 在 WP1 开发期间只读审计当前控制面、状态转换、provider、报告和 evaluator 测试覆盖；输出一张
-> “分支—现有测试—缺口—建议测试名—预期断言—所属 WP”的矩阵。不得修改核心代码和实验合同，
-> 不得用当前 coverage 数字替代 WP1–WP3 合入后的最终测量。
+> 运行完整测试、clean environment、CLI/compile/leak checks 和 scripted 15-slot；生成 acceptance
+> manifest、planned/observed graph 对齐表和允许/禁止 claim 更新。失败只修复 v2 范围内缺陷，不降低
+> rubric，不修改 frozen v1 evaluator/gold。
 
-Chat B 合入并经高阶审查后再启动 WP2；不要提前让 WP2 writer 基于旧接口并行编码。
+### Task 4：live smoke 与必要重跑（需研究者一次性 API 授权）
+
+> 先跑 3 条：普通多步、故障后 Scientist 修订、AI UserAgent 澄清。三条通过后，若 v2 改变了 v1 的
+> 核心行为或报告终态，在新协议/目录重跑 v2 5×3；不得用新代码重新解释旧工件。记录模型、prompt、
+> commit、预算、tokens、wall time 和全部失败。
+
+### Task 5：原 20-request 轻量闭环（可选，不阻塞文本）
+
+> 复用原论文精确请求和已有人审语义，冻结 v2 单一最终条件；运行 20×1，报告 planning correctness、
+> result/terminal correctness、report completeness、false-success、trace/artifact completeness 和成本，
+> 并按 6.4 做 AI UserAgent/AI judge 与风险抽样。不得宣称与原论文完全 matched，也不得把 AI judge
+> 当作新的领域专家人审。
+
+Task 1–3 可由工程模型独立完成；Task 4 只需研究者授权 API，不要求逐条操作；Task 5 中 AI 可完成
+运行和初评，研究者只批准复用口径并审查异常/分歧/抽样。开题图表与章节文本和 Task 1–4 并行，
+Task 5 若影响九月中旬写作则直接取消。目标 B held-out proposal 不在当前开工队列。
 
 ## 10. 第二章与第三章对接计划
 
@@ -440,26 +594,27 @@ behavior、user utility、efficiency 分别报告。`RunResult.validation` 仍�
 
 | 阶段 | 何时开始 | 工作 | 完成标志 |
 | --- | --- | --- | --- |
-| X0 接口冻结 | 现在，与 WP1 并行 | 审查 Ch2 bundle、Ch3 task/trace 资产；冻结上述 JSON 合同和两组例子 | proposal 获批，schema owner 明确 |
-| X1 provider examples | 现在，可由下游仓库并行 | Ch2 导出一个 diagnostic bundle；Ch3 导出一个 agent/private 分离 EvalTask | examples 可独立 schema validate |
-| X2 URSA ports | WP1 合入后，在独立分支 | `ScientificConstraintPort`、NoOp/Fake adapter、三调用点和 trace refs | port integration tests 通过 |
-| X3 C1 实验冻结 | WP1–WP4a 后 | 三次 smoke + 5×3；冻结 `v0.5.1` experiment commit | C1 claim-safe memo |
-| X4 Ch2 接入 | C1 15-run 后合入 X2 | 消费 Ch2 bundle，跑 1–2 个 diagnostic 行为改变案例 | 无第二调度器；plan/report 可观察改变 |
-| X5 Ch3 接入 | WP2/WP3 字段稳定后开发，C1 15-run 后合入 | `TrialExporter` + EvalTask adapter + deterministic graders | offline evaluation MVP |
+| X0 接口冻结 | V2-E1/E2 验收后按写作优先级启动 | 审查 Ch2 bundle、Ch3 task/trace 资产；冻结上述 JSON 合同和两组例子 | proposal 获批，schema owner 明确 |
+| X1 provider examples | deferred；不与 v2 争用第一章 writer | Ch2 导出一个 diagnostic bundle；Ch3 导出一个 agent/private 分离 EvalTask | examples 可独立 schema validate |
+| X2 URSA ports | V2-E3 完成且 X0 批准后在独立分支启动 | `ScientificConstraintPort`、NoOp/Fake adapter、三调用点和 trace refs | port integration tests 通过 |
+| X3 C1 实验冻结 | completed，2026-08-18 | 三次 smoke + 5×3 + truth/claim audit 已完成 | v1 事实与 claim 边界冻结，不回写 |
+| X4 Ch2 接入 | 可在 C1 证据封存后合入 X2 | 消费 Ch2 bundle，跑 1–2 个 diagnostic 行为改变案例 | 无第二调度器；plan/report 可观察改变 |
+| X5 Ch3 接入 | 可独立准备，开题写作后按优先级合入 | `TrialExporter` + EvalTask adapter + deterministic graders | offline evaluation MVP |
 | X6 跨章 demo | X4+X5 | 同一任务贯通合同、runtime、工具、报告和外部评分 | `v0.7.0` integration demo |
 | X7 正式研究 | 各章人工 Gate 后 | Ch2 matched mechanism study；Ch3 task/user/system study | 分章结果，不用 demo 代替 |
 
 推荐版本语义：
 
 - `v0.5.1`：第一章真实模型 pilot 冻结版；
+- `v0.5.2`：v2 最小 live planning/report/privacy 闭环与验收版；
 - `v0.6.0`：extension-ready，具有 Ch2 port 和 portable TrialExport；
 - `v0.6.1`：一个 Chapter 2 diagnostic contract loop；
 - `v0.7.0`：Chapter 3 deterministic evaluation MVP 与跨章演示。
 
-X0 和两个 X1 schema/example 包可以现在并行；X2 只能在 WP1 合入后开始实现。X2 不得合入或
-改变正在冻结的 C1 5×3 experiment commit。最安全做法是单独
-`codex/ch1-cross-chapter-ports` 分支开发，C1 15-run 结束后再基于冻结 commit rebase/cherry-pick
-并重跑全部回归。这样既不阻塞接口工作，也不污染第一章 matched comparison。
+X1 schema/example 包可以在下游独立准备，但当前不应挤占 V2-E1/E2/E3 和开题写作。
+WP1、C1 15-run 与真实性审计均已完成；X2 仍须等待 v2 验收和 X0 的 schema/owner 裁决，并在单独
+`codex/ch1-cross-chapter-ports` 分支开发。合入前基于冻结 commit rebase/cherry-pick 并重跑全部
+回归，避免污染第一章 matched comparison 的历史证据。
 
 ### 10.7 第二章的实际推进顺序
 
@@ -490,6 +645,41 @@ X0 和两个 X1 schema/example 包可以现在并行；X2 只能在 WP1 合入�
 完成前不能称“稳定系统验证平台”，Gate B 前不能启动正式用户研究。
 
 ### 10.9 “较完整、成熟升级”的阶段定义
+
+开题级完成与工程/毕业级成熟不是同一个 Gate。
+
+开题级完成条件是：
+
+- 已发表 ExpertsRS 的贡献、限制和当前升级问题有清晰映射；
+- v2 的结构化 planned graph、validator、Scientist revision、observed process graph 和运行内
+  checkpoint recovery 有统一系统载体和可复核软件证据；若 v2 未完成，只能降级描述为 v1 执行/
+  审计底盘与初步恢复案例；
+- 至少一次真实模型 pilot 完成，初步信号、失败、反例和不可支持结论被同时报告；
+- Chapter 2/3 的科学约束和外部评价接口有明确后续方案；
+- 不用系统集成 PASS 冒充稳定效果或科学准确性。
+
+这些条件在 V2-E1/E2、无 API 验收、3 条 smoke、claim-safe memo、图表和章节初稿完成后即可满足，
+不要求完成可选 20×1，更不要求先完成 X4–X7。
+
+## 12. v0.5.3 审计补齐记录（2026-08-19）
+
+本轮以 `112ed6f` 为工程基线，保留 v1 panel、gold、既有 v1 runs 和 20-request 人审证据不变。P0
+仅包括：
+
+1. 从原始用户请求以确定性规则生成 runtime-owned `DeliveryObligation`。task-11 强制要求
+   `vegetation_coverage_map`（`plot_thematic_map(mask_raster)`）和 `green_cover_rate`（mask/area
+   证据及“有效影像像元范围内”口径）；Scientist 不得通过 `requested_outputs` 漏列、改名或降级。
+2. v2 evaluator 独立验证“原始请求义务 → 已验证 artifact/plan node → Manager deliverable → 报告”，
+   并把 revision 图差异分类为 `local_reauthorization_only`、`structural_delta` 或
+   `output_scope_delta`。task-11 的同图修订只允许前一种 claim：它证明 observation 后的局部重新授权，
+   不证明更优规划路径。
+3. 隔离的 `ProfiledUserAgent` 仅读取原始请求、Manager 问题和公开 artifact 摘要，固定回答一次
+   “选择 NDVI 并要求地图”，再经 `.resume()` 完成。rule 与 live profile 均为测试夹具，不是常驻第四角色
+   或用户研究；不得读取 panel gold、故障 ledger、私有 evaluator contract 或内部计划。
+4. 统一 closeout manifest 记录 commit、环境、CLI/compile/diff、泄漏扫描、测试、scripted 15-slot、
+   checksum、图对齐和 claim boundary。最终代码提交后才运行新的 `v2_authorized_pilot_<commit>` 5×3。
+5. **20×1 取消且不构成开题 Gate**。最终 5×3 仍是本轮已授权的唯一大规模 live 重跑；任一槽失败保留目录、
+   停止解释性 claim，修复后必须使用新目录重跑。
 
 工程演示完成条件（`v0.7.0`）是：
 

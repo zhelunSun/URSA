@@ -96,6 +96,7 @@ def _role_instructions() -> dict[str, str]:
             "do not omit a validated artifact and do not invent an ID. "
             "When report_deliverables is supplied, copy every factual deliverable exactly: preserve its value, unit, scope, "
             "and artifact_refs.  In particular, never rename a valid-image-pixel percentage as an administrative-area rate. "
+            "delivery_obligations are runtime-owned user obligations: do not omit, rename, downgrade, or add to them. "
             "Include it as the report JSON field deliverables. Every deliverable object must contain exactly "
             "deliverable_id, status, value, unit, scope, artifact_refs; copy status too. "
             "For phase report, the required shape is "
@@ -119,6 +120,8 @@ def _role_instructions() -> dict[str, str]:
             '{"node_id":"index_map","operator_id":"expertsrs.plot_index_map.v1","inputs":{"file_path":"ndvi_raster"},"output_artifact_id":"ndvi_map","config":{},"depends_on":["ndvi"]}]}}. '
             "For green cover, add threshold (expertsrs.apply_threshold.v1, input ndvi_raster, output greenspace_mask, config {\"threshold_low\":0.3}, depends_on ndvi), "
             "then thematic_map (expertsrs.plot_thematic_map.v1) and area_statistics (expertsrs.calculate_area.v1) from greenspace_mask; expected_outputs must include mask_raster and area_statistics, required_metrics must be [\"green_cover_rate\"]. "
+            "For a vegetation-coverage request, requested_outputs must include exactly vegetation_coverage_map and green_cover_rate; thematic_map is the vegetation coverage map, never the NDVI map. "
+            "delivery_obligations are mandatory runtime-owned outputs: you may add supported outputs but may not omit, rename, or downgrade one. "
             "The only raw input artifact is input_raster; never include a URI, path, data value, or unlisted tool. "
             "For an initial supplied raster, metadata must be the first eligible node before analysis nodes. "
             "If the user requests a named index/operator that is absent from available_tools, return stop with a concise unsupported-catalog reason; do not ask the user to define it and do not substitute another index. "

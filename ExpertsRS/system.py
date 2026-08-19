@@ -38,8 +38,11 @@ from .workflow import (
     WorkflowTrace,
     build_operator_catalog,
     build_process_graph,
+    classify_graph_diff,
+    derive_delivery_obligations,
     hydrate_task,
     hydrate_workflow,
+    validate_plan_obligations,
     validate_workflow,
 )
 
@@ -172,6 +175,7 @@ class ExpertsRSSystem:
             "active_plan_id": None,
             "current_plan": None,
             "planned_graph": None,
+            "delivery_obligations": [item.to_dict() for item in derive_delivery_obligations(request.request)],
             "plan_history": [],
             "node_states": {},
             "workflow_artifact_records": {},
@@ -282,6 +286,7 @@ class ExpertsRSSystem:
             "current_plan": state.get("current_plan"),
             "active_plan_id": state.get("active_plan_id"),
             "eligible_node_ids": self._eligible_node_ids(state),
+            "delivery_obligations": state.get("delivery_obligations", []),
             "report_deliverables": self._report_deliverables(state),
             "remaining_tool_budget": budgets["max_tool_calls"] - state["tool_calls"],
         }
@@ -343,6 +348,7 @@ class ExpertsRSSystem:
         task = hydrate_task(task_payload)
         graph = hydrate_workflow(graph_payload, catalog, input_paths)
         report = validate_workflow(task, graph, catalog)
+        validate_plan_obligations(state.get("delivery_obligations", []), task_payload, graph_payload)
         unsafe_nodes = [
             node.node_id for node in graph.nodes
             if catalog.get(node.operator_id) is None
@@ -356,6 +362,7 @@ class ExpertsRSSystem:
             raise ValueError("Scientist workflow failed runtime validation")
 
         is_revision = decision["kind"] == "revise"
+        previous_graph = state.get("planned_graph")
         prior = state.get("active_plan_id")
         version = state["plan_count"] + 1
         trigger = None
@@ -386,6 +393,7 @@ class ExpertsRSSystem:
             "required_metrics": list(task.required_metrics),
         }
         state["planned_graph"] = {"task": task_payload, "workflow": graph_payload}
+        change_class = classify_graph_diff(previous_graph, state["planned_graph"], is_revision=is_revision)
         if not is_revision:
             state["node_states"] = {node.node_id: "pending" for node in graph.nodes}
             state["workflow_artifact_records"] = {}
@@ -403,8 +411,12 @@ class ExpertsRSSystem:
         }, actor="Scientist", object_id=f"{plan.object_id}:workflow")
         state["plan_history"].append({
             "plan_version_id": plan.object_id, "task": task_payload, "workflow": graph_payload,
-            "affected_node_ids": affected,
+            "affected_node_ids": affected, "revision_change_class": change_class,
         })
+        self._append_trace(state, "plan_graph_diff_classified", {
+            "plan_version_id": plan.object_id, "classification": change_class,
+            "parent_plan_id": prior,
+        }, actor="Runtime")
         self._sync_trace(state)
 
     def _validate_local_patch(self, state: dict[str, Any], graph: Any, affected: list[str]) -> None:
@@ -443,28 +455,23 @@ class ExpertsRSSystem:
 
     def _report_deliverables(self, state: dict[str, Any]) -> list[dict[str, Any]]:
         """Build a small, path-free factual view for the Manager report role."""
+        artifacts = state.get("artifacts", [])
         by_type: dict[str, list[dict[str, Any]]] = {}
-        for artifact in state.get("artifacts", []):
+        by_node: dict[str, list[dict[str, Any]]] = {}
+        for artifact in artifacts:
             by_type.setdefault(artifact["artifact_type"], []).append(artifact)
-        required = (state.get("current_plan") or {}).get("required_metrics", [])
-        requested = (state.get("planned_graph") or {}).get("task", {}).get("requested_outputs", [])
+            by_node.setdefault(artifact.get("producer_plan_node_id") or "", []).append(artifact)
+        required = {item["obligation_id"] for item in state.get("delivery_obligations", [])}
         deliverables: list[dict[str, Any]] = []
-        if "ndvi_map" in requested:
-            maps = by_type.get("map", [])
+        if "ndvi_map" in required:
+            maps = by_node.get("index_map", [])
             if maps:
                 deliverables.append({
                     "deliverable_id": "ndvi_map", "status": "delivered", "value": "NDVI map",
                     "unit": None, "scope": "supplied raster extent", "artifact_refs": [maps[-1]["artifact_id"]],
                 })
-        if "greenspace_map" in requested:
-            maps = by_type.get("map", [])
-            if maps:
-                deliverables.append({
-                    "deliverable_id": "greenspace_map", "status": "delivered", "value": "greenspace thematic map",
-                    "unit": None, "scope": "supplied raster extent", "artifact_refs": [maps[-1]["artifact_id"]],
-                })
-        if "vegetation_coverage_map" in requested:
-            maps = by_type.get("map", [])
+        if "vegetation_coverage_map" in required:
+            maps = by_node.get("thematic_map", [])
             if maps:
                 deliverables.append({
                     "deliverable_id": "vegetation_coverage_map", "status": "delivered",
@@ -472,14 +479,12 @@ class ExpertsRSSystem:
                     "scope": "supplied raster extent", "artifact_refs": [maps[-1]["artifact_id"]],
                 })
         if "green_cover_rate" in required:
-            masks = by_type.get("mask_raster", [])
-            areas = by_type.get("area_statistics", [])
-            if masks:
+            masks = by_node.get("threshold", [])
+            areas = by_node.get("area_statistics", [])
+            if masks and areas:
                 metadata = masks[-1].get("metadata", {})
                 percentage = (metadata.get("percentages") or {}).get("class_1")
-                refs = [masks[-1]["artifact_id"]]
-                if areas:
-                    refs.append(areas[-1]["artifact_id"])
+                refs = [masks[-1]["artifact_id"], areas[-1]["artifact_id"]]
                 if isinstance(percentage, (int, float)):
                     deliverables.append({
                         "deliverable_id": "green_cover_rate", "status": "delivered", "value": percentage,
@@ -707,6 +712,11 @@ class ExpertsRSSystem:
         persisted_state = self._sanitize_for_persistence(state)
         (run_dir / "state.json").write_text(json.dumps(persisted_state, indent=2, ensure_ascii=False), encoding="utf-8")
         (run_dir / "result.json").write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        (run_dir / "delivery_obligations.json").write_text(
+            json.dumps({"view_type": "delivery_obligation_manifest", "run_id": state["run_id"],
+                        "obligations": state.get("delivery_obligations", [])}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
         (run_dir / "manifest.json").write_text(
             json.dumps({
                 "run_id": state["run_id"],
@@ -724,6 +734,7 @@ class ExpertsRSSystem:
         planned_graph = {
             "view_type": "planned_workflow_graph",
             "run_id": state["run_id"],
+            "delivery_obligations": state.get("delivery_obligations", []),
             "plan_versions": state.get("plan_history", []),
         }
         (run_dir / "planned_workflow_graph.json").write_text(
@@ -757,16 +768,19 @@ class ExpertsRSSystem:
         declared = {item["deliverable_id"]: item for item in decision["deliverables"]}
         if len(declared) != len(decision["deliverables"]):
             raise ValueError("Report deliverable identifiers must be unique")
-        requested = set((state.get("planned_graph") or {}).get("task", {}).get("requested_outputs", []))
+        requested = {item["obligation_id"] for item in state.get("delivery_obligations", [])}
         incomplete: list[str] = []
+        for deliverable_id, candidate in declared.items():
+            if deliverable_id not in requested:
+                raise ValueError("Report declared a deliverable outside the runtime obligation registry")
+            if set(candidate["artifact_refs"]) - set(artifacts_by_id):
+                raise ValueError("Report deliverable references an unknown artifact")
         for deliverable_id in requested:
             candidate = declared.get(deliverable_id)
             fact = factual.get(deliverable_id)
             if candidate is None or candidate["status"] != "delivered" or fact is None:
                 incomplete.append(deliverable_id)
                 continue
-            if set(candidate["artifact_refs"]) - set(artifacts_by_id):
-                raise ValueError("Report deliverable references an unknown artifact")
             if candidate["value"] != fact["value"] or candidate["unit"] != fact["unit"]:
                 raise ValueError("Report deliverable value is not supported by runtime facts")
             if candidate["scope"] != fact["scope"]:
