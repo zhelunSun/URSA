@@ -11,4 +11,6 @@
 
 最终 pilot 的 v2 evaluator 为通过判据；v1 evaluator 仅并列保留作历史记录。前两轮 14/15、13/15 的目录也保留，失败原因是 provider 将相同 JSON 决策重复拼接；它们不支持任何成功 claim。
 
+统一 closeout manifest 位于 `v2_acceptance_0efd090/closeout_manifest.json`：主环境及 clean-venv 均为 121/121，`compileall`、`git diff --check`、CLI NDVI、scripted 15-slot 和隐私扫描均通过。
+
 允许 claim：结构化计划约束执行；task-11 可在 observation 后由 Scientist 局部重新授权并交付专题图和受限比例；澄清可由隔离 profile 回答后经 `.resume()` 结束。禁止 claim：规划优越性、行政区绿地覆盖率、稳定效果、用户研究结论、20×1 结果或 durable recovery。
