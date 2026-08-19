@@ -38,8 +38,10 @@ def _decode_single_json_object(content: str) -> dict[str, Any]:
 
     Some OpenAI-compatible endpoints wrap a JSON-mode response in a Markdown
     fence despite being asked not to. The fence is transport decoration, not
-    part of the decision. No prose, a second JSON value, or any other trailing
-    content is accepted: ``json.loads`` remains the strict boundary.
+    part of the decision. A few compatible endpoints duplicate the *identical*
+    JSON-mode payload; that exact transport duplication is canonicalised to one
+    object. Prose, a different second decision, or any other trailing content
+    remains rejected.
     """
     normalized = content.strip()
     if normalized.startswith("```"):
@@ -51,7 +53,13 @@ def _decode_single_json_object(content: str) -> dict[str, Any]:
         # A few compatible endpoints emit only the closing fence after a
         # correctly JSON-formatted body. Permit that exact decoration only.
         normalized = normalized[:-3].rstrip()
-    decision = json.loads(normalized)
+    decoder = json.JSONDecoder()
+    decision, end = decoder.raw_decode(normalized)
+    trailing = normalized[end:].strip()
+    if trailing:
+        duplicate, duplicate_end = decoder.raw_decode(trailing)
+        if duplicate != decision or trailing[duplicate_end:].strip():
+            raise ValueError("decision must contain one JSON object")
     if not isinstance(decision, dict):
         raise ValueError("decision must be a JSON object")
     return decision

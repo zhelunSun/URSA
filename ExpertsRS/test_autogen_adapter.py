@@ -96,14 +96,18 @@ class AutoGenAdapterTests(unittest.TestCase):
         decision = asyncio.run(provider.decide("Manager", {"request": "NDVI", "phase": "initial"}))
         self.assertEqual(decision["kind"], "handoff")
 
-        invalid = AutoGenSelectorDecisionProvider.create(self._client(
+        duplicated = AutoGenSelectorDecisionProvider.create(self._client(
             '{"kind":"handoff","target":"Scientist"}\n{"kind":"handoff","target":"Scientist"}'
         ), {
             "Manager": "Return JSON decisions.",
             "Scientist": "Return JSON decisions.",
             "Engineer": "Return JSON decisions.",
         })
-        with self.assertRaises(json.JSONDecodeError):
+        self.assertEqual(asyncio.run(duplicated.decide("Manager", {"request": "NDVI", "phase": "initial"}))["kind"], "handoff")
+        invalid = AutoGenSelectorDecisionProvider.create(self._client(
+            '{"kind":"handoff","target":"Scientist"}\n{"kind":"clarify","question":"different"}'
+        ), {"Manager": "Return JSON decisions.", "Scientist": "Return JSON decisions.", "Engineer": "Return JSON decisions."})
+        with self.assertRaises(ValueError):
             asyncio.run(invalid.decide("Manager", {"request": "NDVI", "phase": "initial"}))
 
     def test_unified_runtime_persists_actual_team_state(self):
