@@ -42,6 +42,11 @@ class ProviderTests(unittest.TestCase):
         self.assertIn("expected_outputs", instruction)
         self.assertIn("inputs must be an object", instruction)
 
+    def test_manager_report_contract_includes_deliverable_status(self):
+        instruction = _role_instructions()["Manager"]
+        self.assertIn("deliverable_id, status, value, unit, scope, artifact_refs", instruction)
+        self.assertIn('"status":"delivered"', instruction)
+
     def test_scripted_mode_is_explicit_in_result_and_manifest(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

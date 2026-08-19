@@ -96,7 +96,10 @@ def _role_instructions() -> dict[str, str]:
             "do not omit a validated artifact and do not invent an ID. "
             "When report_deliverables is supplied, copy every factual deliverable exactly: preserve its value, unit, scope, "
             "and artifact_refs.  In particular, never rename a valid-image-pixel percentage as an administrative-area rate. "
-            "Include it as the report JSON field deliverables. "
+            "Include it as the report JSON field deliverables. Every deliverable object must contain exactly "
+            "deliverable_id, status, value, unit, scope, artifact_refs; copy status too. "
+            "For phase report, the required shape is "
+            "{\"kind\":\"report\",\"summary\":\"...\",\"artifact_refs\":[\"...\"],\"deliverables\":[{\"deliverable_id\":\"...\",\"status\":\"delivered\",\"value\":\"...\",\"unit\":null,\"scope\":\"...\",\"artifact_refs\":[\"...\"]}]}. "
             "Do not include paths, data values, or prose outside JSON."
         ),
         "Scientist": (
