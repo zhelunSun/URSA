@@ -21,6 +21,9 @@
 | `C1-BOUNDARY-01` | accepted-framing | 第一章保证工作流安全、完整、可追溯地运行并承担检查点恢复；第二章判断方法与结论为何需要修改并输出有依据的行动义务；第三章在系统外独立评价结果、过程和用户效用。 | module continuity map、validation ladder、thesis state、researcher clarification 2026-08-11 | 通用工具底线与任务特定科学判断仍需在实现和实验中按此边界审计 | D2 只实现运行边界；第二章约束复用第一章恢复接口；第三章保持标准答案隔离 |
 | `C1-EFF-01` | live-execution-blocked | 不得使用“adaptive trace-native execution 提高了真实 LLM 任务可靠性”。 | D3-light 5-task panel、B1/B2/B3 contracts、leakage-safe loader、15-slot deterministic dry run、local-tool preflight | 当前 direct 模型调用适配器不是 AG2 多 Agent 调度；static/adaptive live run 尚未存在，API 双门禁关闭 | 先让既有 AG2 角色路由与运行时记录通过小型 bridge 合流，再固定共同强制的模型/工具/预算并完成 15-run smoke；稳定后决定是否做 3 次重复与 error analysis |
 | `C1-EFF-02` | prohibited | 不得使用“多智能体普遍优于单智能体”。 | 无当前新证据 | agent count 与 method factor 混杂 | 独立 matched factor study，若确有必要 |
+| `C1-V2-01` | supported-live | runtime-owned obligation 将 task-11 的专题图与受限比例独立闭合，NDVI 图不能替代专题图。 | `v053_evidence_index.md`、0efd090 pilot、v2 evaluator | 单场景、固定阈值；不验证行政区分母或主题精度 | 独立 AOI/行政区与科学验证 |
+| `C1-V2-02` | supported-live-narrow | task-11 在 observation 后由 Scientist 局部重新授权执行。 | 0efd090 B2/B3 trace、graph diff | diff 为 `local_reauthorization_only`，不支持规划优越性 | matched planning-quality study |
+| `C1-V2-03` | supported-fixture | 一次澄清可由隔离 profile 回答并经 `.resume()` 完成。 | `v2_user_agent_smoke_bb7c8bf` | 不是用户研究、不是第四角色 | 伦理批准的用户研究 |
 
 ## 引用格式示例
 

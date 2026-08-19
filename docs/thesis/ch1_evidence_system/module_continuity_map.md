@@ -49,6 +49,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     U["User"] <-->|"澄清 · 确认"| M["Manager<br/>用户接口与结果解释"]
+    UA["ProfiledUserAgent<br/>隔离测试夹具"] -. "一次澄清回答；非第四角色" .-> M
     M -->|"用户意图边界"| S["Scientist<br/>方法判断与分层规划"]
     S -->|"阶段计划"| E["Engineer<br/>工具选择与参数实现"]
     E -->|"候选工具动作"| X["Executor<br/>唯一真实执行入口"]
@@ -65,8 +66,9 @@ Executor 负责真实执行；运行时和审核器都不是新的 Agent。
 
 ```mermaid
 flowchart LR
-    I["Manager 确认的用户意图"] --> P["Scientist 分层规划<br/>总体目标 · 当前阶段 · 下一动作"]
-    P --> A["Engineer 提出工具动作"]
+    I["Manager 确认的用户意图"] --> OBL["runtime-owned 交付义务"]
+    OBL --> P["Scientist 完整 planned graph"]
+    P --> A["Engineer 仅选 eligible node"]
     A --> C{"运行时检查<br/>规则 · 权限 · 预算"}
     C -->|"通过"| X["Executor 真实执行"]
     C -->|"拒绝或需确认"| Q["停止 · 询问 · 改道"]
@@ -80,7 +82,7 @@ flowchart LR
     G --> D{"任务是否完成"}
     D -->|"否"| P
     D -->|"是"| M["Manager 解释并交付结果"]
-    F --> H["读取最近安全检查点"]
+    F --> H["Scientist 修订：局部重新授权"]
     H --> P
 ```
 

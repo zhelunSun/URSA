@@ -9,6 +9,8 @@
 | 对象 | 当前实现 | 证据角色 | 客观缺口 | 允许表述 |
 | --- | --- | --- | --- | --- |
 | 角色分工 | Manager/Scientist/Engineer + User/Executor；notebook 与 ReAct sidecar | prior + engineering | 未证明角色数量或 multi-agent 本身带来增益 | 保留已发表原型的协作设计 |
+| v2 交付闭合 | runtime-owned `DeliveryObligation`、Manager structured deliverables、v2 evaluator | live engineering evidence | 仅受支持规则与单场景 | 原始请求不能被 Scientist 的 requested_outputs 静默删减 |
+| ProfiledUserAgent | 一次性规则/live clarification fixture | isolated integration evidence | 非常驻角色、非用户研究 | 证明 `.resume()` 闭环，不证明用户效用 |
 | 18-tool layer | 四个 kit、registry、schema、结构化返回、semantic band resolver | engineering | 依赖只设下限、未冻结环境；多传感器语义覆盖有限 | 建立了带 fail-closed 科学前置条件的统一工具表面 |
 | `TaskSpec` | goal、AOI/time、expected outputs、constraints 等 | engineering | 无 schema version/round-trip test；尚未由 LLM 稳定生成 | 实现了最小 typed task object |
 | `OperatorSpec` | 18 adapters、typed input/output、required bands/config、precondition、failure/default | engineering | 类型仍粗；缺 graph-level CRS、resolution、extent 与完整 sensor ontology | 为现有工具建立 versioned minimal contracts |

@@ -681,6 +681,14 @@ WP1、C1 15-run 与真实性审计均已完成；X2 仍须等待 v2 验收和 X0
 5. **20×1 取消且不构成开题 Gate**。最终 5×3 仍是本轮已授权的唯一大规模 live 重跑；任一槽失败保留目录、
    停止解释性 claim，修复后必须使用新目录重跑。
 
+### v0.5.3 完成状态
+
+- 最终代码：`0efd090`；scripted acceptance `v2_acceptance_0efd090` 为 15/15；CLI NDVI 闭环完成。
+- 最终 live pilot：`v2_authorized_pilot_0efd090`，15/15 v2 closure。终态为 5 completed、7 controlled-stop、3 needs-clarification；v1 evaluator 仅保留并列历史记录。
+- task-11 B2/B3 有两项 obligation、失败 observation、Scientist revision、checkpoint（B3）和两类图；graph diff 为 `local_reauthorization_only`。
+- `v2_user_agent_smoke_bb7c8bf` 的 rule/live profile 均完成一次澄清—回答—`.resume()`；其证据范围是隔离夹具。
+- 之前 14/15、13/15 的 live 目录保留为失败证据；同一 JSON 被 provider 重复拼接的传输现象已仅对完全相同对象规范化，异值第二决策仍 fail-closed。
+
 工程演示完成条件（`v0.7.0`）是：
 
 - 同一个用户请求进入唯一 runtime；
