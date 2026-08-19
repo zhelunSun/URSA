@@ -53,3 +53,9 @@ def run_v2_profiled_user_agent_smokes(destination: str | Path) -> dict[str, Any]
     if not summary["all_passed"]:
         raise RuntimeError("Profiled UserAgent smoke did not close clarification/resume")
     return summary
+
+
+if __name__ == "__main__":
+    import sys
+    target = Path(sys.argv[1]) if len(sys.argv) == 2 else Path(__file__).resolve().parents[2] / "results" / "ch1_d3_light" / "v2_profiled_user_agent_smoke"
+    print(json.dumps(run_v2_profiled_user_agent_smokes(target), ensure_ascii=False, indent=2))
