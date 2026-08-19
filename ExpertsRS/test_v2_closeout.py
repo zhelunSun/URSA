@@ -100,6 +100,26 @@ class V2CloseoutTests(unittest.TestCase):
         self.assertIn("40.76", report)
         self.assertNotIn("东城区绿地覆盖率", report)
 
+    def test_vegetation_coverage_map_is_a_delivered_report_obligation(self):
+        class CoverageMapProvider:
+            def __init__(self):
+                self.delegate = ScriptedDecisionProvider()
+
+            async def decide(self, role, state):
+                decision = await self.delegate.decide(role, state)
+                if role == "Scientist" and decision.get("kind") == "plan":
+                    decision["task"]["requested_outputs"] = ["vegetation_coverage_map", "green_cover_rate"]
+                return decision
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run(
+                "Calculate vegetation coverage and green cover rate for Dongcheng", Path(directory),
+                system=ExpertsRSSystem(provider=CoverageMapProvider()),
+            )
+            report = result.report or ""
+        self.assertEqual(result.status, RunStatus.COMPLETED)
+        self.assertIn("vegetation_coverage_map: delivered", report)
+
     def test_persisted_provider_state_excludes_thought_events_and_resumes(self):
         class ThoughtStateProvider:
             def __init__(self):

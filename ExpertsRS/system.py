@@ -463,6 +463,14 @@ class ExpertsRSSystem:
                     "deliverable_id": "greenspace_map", "status": "delivered", "value": "greenspace thematic map",
                     "unit": None, "scope": "supplied raster extent", "artifact_refs": [maps[-1]["artifact_id"]],
                 })
+        if "vegetation_coverage_map" in requested:
+            maps = by_type.get("map", [])
+            if maps:
+                deliverables.append({
+                    "deliverable_id": "vegetation_coverage_map", "status": "delivered",
+                    "value": "vegetation coverage thematic map", "unit": None,
+                    "scope": "supplied raster extent", "artifact_refs": [maps[-1]["artifact_id"]],
+                })
         if "green_cover_rate" in required:
             masks = by_type.get("mask_raster", [])
             areas = by_type.get("area_statistics", [])

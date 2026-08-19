@@ -556,6 +556,7 @@ async def run_authorized_d3_smoke(
     slots: list[D3CaseSlot] | None = None,
     panel: dict[str, Any] | None = None,
     system_factory: Any | None = None,
+    continue_on_v1_evaluation_failure: bool = False,
 ) -> list[dict[str, Any]]:
     """Run reviewed smoke slots via the authoritative live runtime only.
 
@@ -588,7 +589,7 @@ async def run_authorized_d3_smoke(
         path = root / f"{len(results) + 1:02d}_{slot.case_id}.json"
         path.write_text(__import__("json").dumps(record, indent=2), encoding="utf-8")
         results.append(record)
-        if not evaluation["passed"]:
+        if not evaluation["passed"] and not continue_on_v1_evaluation_failure:
             raise RuntimeError(f"D3 live smoke evaluator failed: {slot.case_id}: {evaluation}")
     return results
 

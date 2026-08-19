@@ -40,7 +40,9 @@ def run_v2_authorized_model_smoke(destination: str | Path) -> list[dict[str, Any
     _load_untracked_environment()
     provider = _provider_config_from_environment()
     slots = smoke_slots()
-    records = asyncio.run(run_authorized_d3_smoke(root, provider, slots=slots))
+    records = asyncio.run(run_authorized_d3_smoke(
+        root, provider, slots=slots, continue_on_v1_evaluation_failure=True,
+    ))
     v2_records: list[dict[str, Any]] = []
     for slot, record in zip(slots, records, strict=True):
         result_data = record["result"]
