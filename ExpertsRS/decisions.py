@@ -8,6 +8,7 @@ verified without a network call or an installed model provider.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Any, Protocol
 
 from pydantic import ValidationError
@@ -30,6 +31,30 @@ ROLE_DECISION_MODELS: dict[str, tuple[type[Any], ...]] = {
     "Scientist": (ScientistPlanDecision, ScientistReviseDecision, ScientistStopDecision),
     "Engineer": (EngineerActionDecision, EngineerHandoffDecision, EngineerStopDecision),
 }
+
+
+def _decode_single_json_object(content: str) -> dict[str, Any]:
+    """Decode one decision, allowing only a conventional JSON code fence.
+
+    Some OpenAI-compatible endpoints wrap a JSON-mode response in a Markdown
+    fence despite being asked not to. The fence is transport decoration, not
+    part of the decision. No prose, a second JSON value, or any other trailing
+    content is accepted: ``json.loads`` remains the strict boundary.
+    """
+    normalized = content.strip()
+    if normalized.startswith("```"):
+        opening, separator, body = normalized.partition("\n")
+        if opening.lower() not in {"```", "```json"} or not separator or not body.endswith("```"):
+            raise ValueError("decision must be one JSON object, optionally in a JSON code fence")
+        normalized = body[:-3].rstrip()
+    elif normalized.endswith("```"):
+        # A few compatible endpoints emit only the closing fence after a
+        # correctly JSON-formatted body. Permit that exact decoration only.
+        normalized = normalized[:-3].rstrip()
+    decision = json.loads(normalized)
+    if not isinstance(decision, dict):
+        raise ValueError("decision must be a JSON object")
+    return decision
 
 
 def parse_role_decision(role: str, payload: Any) -> dict[str, Any]:
@@ -264,7 +289,6 @@ class AutoGenSelectorDecisionProvider:
         return provider
 
     async def decide(self, role: str, state: dict[str, Any]) -> dict[str, Any]:
-        import json
         from .provider import classify_provider_exception
 
         if role not in self.agents:
@@ -280,8 +304,8 @@ class AutoGenSelectorDecisionProvider:
         content = getattr(message, "content", None)
         if not isinstance(content, str):
             raise ValueError(f"{role} produced no textual structured decision")
-        decision = json.loads(content)
-        if not isinstance(decision, dict) or not isinstance(decision.get("kind"), str):
+        decision = _decode_single_json_object(content)
+        if not isinstance(decision.get("kind"), str):
             raise ValueError(f"{role} produced an invalid structured decision")
         usage = getattr(message, "models_usage", None)
         if usage is None:

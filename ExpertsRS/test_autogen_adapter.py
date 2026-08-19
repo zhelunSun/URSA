@@ -85,6 +85,27 @@ class AutoGenAdapterTests(unittest.TestCase):
         state = asyncio.run(provider.save_state())
         self.assertTrue(state["agent_states"]["manager"]["agent_state"]["llm_context"]["messages"])
 
+    def test_adapter_allows_only_a_single_json_code_fence(self):
+        provider = AutoGenSelectorDecisionProvider.create(self._client(
+            '```json\n{"kind":"handoff","target":"Scientist"}\n```'
+        ), {
+            "Manager": "Return JSON decisions.",
+            "Scientist": "Return JSON decisions.",
+            "Engineer": "Return JSON decisions.",
+        })
+        decision = asyncio.run(provider.decide("Manager", {"request": "NDVI", "phase": "initial"}))
+        self.assertEqual(decision["kind"], "handoff")
+
+        invalid = AutoGenSelectorDecisionProvider.create(self._client(
+            '{"kind":"handoff","target":"Scientist"}\n{"kind":"handoff","target":"Scientist"}'
+        ), {
+            "Manager": "Return JSON decisions.",
+            "Scientist": "Return JSON decisions.",
+            "Engineer": "Return JSON decisions.",
+        })
+        with self.assertRaises(json.JSONDecodeError):
+            asyncio.run(invalid.decide("Manager", {"request": "NDVI", "phase": "initial"}))
+
     def test_unified_runtime_persists_actual_team_state(self):
         from ExpertsRS.decisions import ScriptedDecisionProvider
         task, workflow = ScriptedDecisionProvider._workflow("ndvi", "Map NDVI")
