@@ -46,5 +46,6 @@ def run_v2_authorized_model_pilot(destination: str | Path) -> list[dict[str, Any
 
 
 if __name__ == "__main__":
-    root = Path(__file__).resolve().parents[2] / "results" / "ch1_d3_light" / "v2_authorized_pilot"
+    import sys
+    root = Path(sys.argv[1]) if len(sys.argv) == 2 else Path(__file__).resolve().parents[2] / "results" / "ch1_d3_light" / "v2_authorized_pilot"
     print(json.dumps(run_v2_authorized_model_pilot(root), indent=2, ensure_ascii=False))
