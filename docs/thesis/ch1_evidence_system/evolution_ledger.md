@@ -210,3 +210,22 @@ API key 不进入代码、运行记录或 Git；API 双门禁在请求发出前�
 3. 为 D3-light 固定 4--6 个代表任务、同模型/工具/预算和最小评分口径，再接真实 Scientist 生成/修改计划；
 4. 先比较静态预先规划、反馈后调整计划、增加检查点恢复三种条件，再决定是否扩大；
 5. 只有在可复现的 live-LLM 匹配实验后，才讨论规划可靠性、恢复收益或成本；第二章科学约束与第三章完整评测保持隔离。
+
+## S10：v0.5.3 统一 live runtime 与开题材料收口（2026-08-27—2026-08-29）
+
+在冻结 v1 历史证据不变的前提下，v0.5.3 完成了以下升级：真实 Scientist 输出完整、无路径的
+`TaskSpec + WorkflowGraph`；Engineer 只能选择当前可执行节点，runtime 绑定工具、逻辑输入、权限
+与参数；工具失败转为 observation 并要求 Scientist 引用父计划、影响范围与 checkpoint 修订；计划图
+按版本持久化，事实过程图由 trace 重建；原始用户请求形成独立交付义务，Manager 报告和 v2
+evaluator 共同检查 artifact、结构化 deliverable、自然语言报告与诚实终态。
+
+最终代码基线为 `0efd090`。主环境与 clean venv 均为 121/121；冻结的 5 任务 × 3 条件真实模型
+pilot 为 15/15 v2 evaluator closure，终态分布为 5 completed、7 controlled-stop、3
+needs-clarification。task-11 的专题图和“有效影像像元范围内”比例分别闭合；其计划差异被分类为
+`local_reauthorization_only`。隔离的规则/live UserAgent smoke 证明一次澄清回答可通过 `.resume()`
+继续，但不构成用户研究或系统常驻第四角色。
+
+本阶段允许晋级为 `supported-live-integration`：证明统一链路、协议、隐私和诚实终态在冻结小面板
+中可以闭合。仍禁止规划优越性、checkpoint 独立效应、行政区覆盖率、主题精度、跨任务泛化、
+进程沙箱、durable recovery 或生产级通用 Harness claim。第一章由继续扩建转入章节写作、图表、
+证据索引和面试表达；任何正式 baseline/ablation 或重复实验必须另行批准。

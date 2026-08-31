@@ -7,6 +7,10 @@
 > 将静态图降为基线/中间资产，并冻结“可调整的分层规划、随执行更新的过程图、基于检查点的
 > 局部恢复”三个对象。
 
+> Implementation update（2026-08-29）：下方 `Consequences` 保留接受 ADR 时的历史状态；其中
+> “typed workflow 与 live 尚未贯通”等缺口已由 v0.5.3 解决。当前事实以 `claim_registry.md`、
+> `v053_evidence_index.md` 和 evolution ledger 的 S10 为准；本 ADR 的架构取舍本身仍有效。
+
 ## Context
 
 `origin/codex/ch1-runtime-foundation` 已实现显式 RunState、artifacts、evaluator、orchestrator、backend provenance 等广义运行时能力。当前 `main` 工作树又形成了更小的 `workflow/` kernel 与 ReAct sidecar。两者在 contract、state、trace 和 orchestration 上部分重叠，但服务的研究目标不同。

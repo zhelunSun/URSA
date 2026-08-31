@@ -1,7 +1,7 @@
 # 第一章收敛执行计划：冻结 v1 证据 → v2 最小工程闭环 → 开题文本
 
-> 状态：active；v1 保持历史冻结证据，v0.5.3 审计缺口收口与最终 v2 5×3 已获授权
-> 决策日期：2026-08-13；最近更新：2026-08-19
+> 状态：active；v1 保持历史冻结证据，v0.5.3 审计缺口收口与最终 v2 5×3 已完成；后续转入架构表达与渐进升级
+> 决策日期：2026-08-13；最近更新：2026-08-25
 > 所属分支：`codex/ch1-v2-e1-structured-planning`
 > 唯一实现入口：`ExpertsRSSystem.run()` / `.resume()` 与 `python -m ExpertsRS`
 
@@ -59,7 +59,7 @@ process graph 主要由事实事后重建。因此当前优先级不是继续横
 | 5×3 真实模型 pilot | 15/15 protocol/evaluator closure | 冻结系统可在有界资源内形成可审计终态；task-11 出现自适应恢复信号 | 稳定机制效应、B3 相对 B2 的增量、科学/空间准确性 |
 | v1 真实性审计 | completed | 15 个 trial 槽位、模型角色调用、工具调用、artifact、trace、plan version、checkpoint 和 observed graph 均有实体证据 | live 完整分层规划已经实现 |
 | pilot outcome 分析 | completed-initial / claim-safe | 唯一故障任务中 B1 停止而 B2/B3 恢复；四个边界任务行为一致 | “规划总体提升”或“checkpoint 已证明更优” |
-| v2 最小工程闭环 | implementation in progress (v0.5.3) | runtime-owned delivery obligations、专题图语义、报告闭合、隔离 UserAgent loop 与新版 evaluator | 最终冻结提交后的 5×3 live 重跑仍待执行 |
+| v2 最小工程闭环 | completed (v0.5.3) | runtime-owned delivery obligations、专题图语义、报告闭合、隔离 UserAgent loop、新版 evaluator 与最终 5×3 live 复验 | 不支持规划优越性、行政区覆盖率、用户研究或 durable recovery |
 | 科学适用性与主题精度 | open，转交 Ch2/Ch3 | — | 当前第一章不得借系统工件自动声称科学正确 |
 
 因此，当前对外阶段名统一使用：
@@ -109,7 +109,7 @@ writer，任何新实验不得回写或覆盖冻结的 v1 pilot。
 | E1 真实性与 claim 审计 | completed | 107 tests 重跑通过；真实 role/tool/artifact/trace/graph 已计数；live plan、report closure、state 脱敏缺口已定位 |
 | V2-E1 live 规划闭环 | completed in v0.5.2; audited in v0.5.3 | 结构化多步计划接入 live；计划节点约束执行；失败回到 Scientist 修订；区分 planned/observed graph |
 | V2-E2 报告与隐私闭环 | completed in v0.5.2; strengthened in v0.5.3 | 原始请求独立义务、task-11 专题图/比例语义、state 去除 ThoughtEvent、修正 revision actor attribution |
-| V2-E3 验收与最终复验 | running，P0 | 新离线 manifest、rule/live UserAgent smoke、最终 v2 5×3；20×1 取消 |
+| V2-E3 验收与最终复验 | completed | 新离线 manifest、rule/live UserAgent smoke、最终 v2 5×3 已完成；20×1 取消 |
 | 开题证据包与文本 | in progress | 架构/方法可立即写；最终结果表在 v2 复验后冻结；不需要 45-run 或完整用户研究 |
 | WP4b / WP5 | deferred / optional | 非开题阻塞；只在不挤占写作或跨章接口确有需要时启动 |
 
@@ -119,7 +119,7 @@ writer，任何新实验不得回写或覆盖冻结的 v1 pilot。
 | --- | --- | ---: | --- |
 | A：v2 工程收口 | 完整计划接入、Scientist 修订、报告闭合、state 脱敏、强化 evaluator | P0 | 核心代码与测试；不覆盖 frozen runs |
 | B：开题文本 | 架构/方法先写；既有成果映射、实验和限制随 v2 结果更新 | P0 | 论文/开题文档 |
-| C：轻量复验 | 3 条 smoke、必要时 v2 5×3、可选原 20-request × 1 条件 | P1 | 新协议/新 run 目录；低成本自动评分 + 人工抽查 |
+| C：轻量复验 | v2 smoke 与 5×3 已冻结；原 20-request 只保留历史/admission benchmark，不启动 20×1 | completed / deferred | 现有新协议/新 run 目录；后续正式 benchmark 由 Chapter 3 另行立项 |
 
 分支和合入规则：
 
@@ -725,3 +725,188 @@ Chapter 3 grader 校准和真实用户研究。
 
 X1-K 与 X1-E 可以互相独立并行；URSA X2 writer 必须等 WP1 接口合入，并以获批 schema/example
 为输入，不能自己重写第二、三章语义。
+
+## 13. 开题后渐进升级路线与 Harness 采用决策（2026-08-21）
+
+### 13.1 总体决定
+
+ExpertsRS 保留 `Brain–Hands/Tools–Data` 作为面向遥感问题的功能架构；workflow 与多智能体属于
+Brain 的规划/协作能力，runtime 是包围 Brain、Tools 和 Data 的共享控制外壳，evaluation 位于被测
+系统之外。后续不得把 workflow、tools、multi-agent、evaluation 误画成四个同层级系统模块。
+
+阶段叙事允许使用 **URSA Harness**，其完整含义固定为“domain-specific、evidence-first research
+harness for remote-sensing workflows”。论文优先写“URSA 领域智能体运行时/研究型 Agent Harness”；
+PPT 和面试可用短名，但不得省略其非通用、非生产级边界，也不因命名改变 Python package、公共 API
+或既有 evidence path。
+
+当前不整体迁移 DeepSeek Harness，也不因 AutoGen 进入 maintenance mode 而立即改写冻结基线。
+DeepSeek Harness 作为现代 harness 的架构参照和潜在执行后端；优先吸收可替换能力边界，不复制其
+通用平台范围。v0.5.3、`0efd090` 与既有 acceptance/live runs 保持不可变证据对象。
+
+这一决定的依据是：
+
+1. 第一章研究对象是 EO-specific typed workflow、plan-bound execution、observation-driven local
+   revision、planned/observed graph 与 delivery closure；替换通用 harness 不直接增强这些 claim。
+2. DeepSeek Harness 以 Node/TypeScript、Cordis plugin tree 和通用 shell/session/subagent 能力为主，
+   不是 AutoGen Python adapter 的原位替换；全量迁移会重做消息、工具、artifact、state、trace、resume
+   和 evaluator transport，并触发新的实验版本。
+3. DeepSeek Harness 当前仍处 developer preview；兼容性风险与第一章的稳定证据需求不匹配。
+4. ExpertsRS runtime 已掌握角色时序、计划验证、工具绑定、权限、终态和评测导出。AutoGen 当前承担
+   model-facing AgentChat/team state，而不是领域控制面，因此可在未来通过 adapter 渐进替换。
+
+### 13.2 有边界的插件化目标
+
+DeepSeek Harness 底层框架名为 `Cordis`，其关键思想不是简单增加插件数量，而是让插件通过共享
+context 提供 service、typed event 和可撤销的注册 effect，并把 service definition、provider 与
+consumer 分离。ExpertsRS 借鉴这一 capability-seam 思想，但不采用“没有特权核心”的全部产品设计。
+
+目标结构固定为 **stable domain kernel + replaceable capability ports + external evaluation**：
+
+- 不可替换的 domain kernel：`RunRequest/RunResult`、typed workflow、validator、eligible-node、
+  delivery obligations、actor attribution、budget/terminal semantics、planned/observed graph 和隐私不变量；
+- 可替换的 capability ports：`DecisionProvider`、`ExecutionBackend`、`EventStore`、
+  `ScientificConstraintProvider` 和 `TelemetrySink`；
+- adapters/providers：AutoGen、direct model、local/subprocess/remote execution、JSONL/SQLite、Chapter 2
+  knowledge provider；
+- external evaluation：gold、fault ledger、grader 和 claim 判定始终不进入 plugin context 或 Agent 上下文。
+
+P1 只使用 Python `Protocol + dependency injection + explicit registry/profile`，不建设动态发现、热加载、
+任意插件卸载或通用 service locator。只有第三方能力、多产品 profile 或长周期服务真正出现后，才评估
+plugin lifecycle manager。这样获得框架可替换性，同时避免配置顺序、隐式依赖、版本组合和安全面膨胀。
+
+直接复用 DeepSeek Harness 代码分三级处理：
+
+1. **优先复用思想和合同**：capability seam、append-only facts、context projection、guarded tool pipeline、
+   profile composition、sandbox enforcement reporting；
+2. **按需复用独立后端**：未来可通过 IPC/CLI/RPC 将其 sandbox/subprocess/remote execution 作为
+   `ExecutionBackend`，先做 parity 原型，不把 Cordis 嵌入领域内核；
+3. **默认不移植核心 TypeScript 包**：agent loop、session 和 tool registry 与 Cordis context/lifecycle
+   深度绑定，移植到 Python 的胶水、重复类型和维护成本通常高于自建薄端口。若复制 MIT 代码，必须保留
+   license/copyright、核查 third-party notices、记录来源与修改，并不得作为论文方法创新。
+
+### 13.3 收益—风险矩阵
+
+| 候选升级 | 对研究主线收益 | 工程收益 | 迁移/证据风险 | 当前决定 |
+| --- | --- | --- | --- | --- |
+| 整体替换为 DeepSeek Harness | 低；不自动产生新的方法证据 | 中高；可获得通用 plugin/session/shell 生态 | 高；跨语言桥接、语义漂移、重跑实验、preview 兼容性 | 不实施 |
+| 借鉴 Cordis capability-seam 与 profile 思想 | 中；让方法内核与框架实现分离 | 高；便于替换、测试和分层演进 | 低；以显式 Python 端口落地 | 采用 bounded plugin architecture |
+| 直接移植 Cordis/DeepSeek Harness 核心 TypeScript 包 | 低 | 低到中；仅在完整 Cordis 生态内明显 | 高；跨语言、生命周期和重复状态 | 默认不实施 |
+| 将 DeepSeek sandbox/subprocess 作为外部 backend | 低到中 | 中高；可能补齐进程隔离 | 中；IPC、版本、Windows 与错误映射 | 需求触发后原型验证 |
+| 抽取 `DecisionProvider` 并保留 AutoGen adapter | 中；降低框架对研究机制的干扰 | 高；可并存 direct/MAF/未来 Harness adapter | 低；用 parity tests 可控 | P1 实施 |
+| 将 state/trace 收束为 append-only `EventStore` + projections | 高；加强 plan/fact/evidence 的统一来源 | 高；支持 replay、resume 和后续 telemetry | 中；需 schema/version 与兼容读取 | P1 设计，分步实施 |
+| 抽取 `ExecutionBackend` | 中；保持 Executor 唯一入口 | 高；为独立进程、容器或远程执行留缝 | 低到中；当前 in-process backend 可保留 | P1 实施接口 |
+| 进程级 sandbox/subprocess backend | 低到中；提升安全边界但非核心 novelty | 高；补齐当前应用层路径围栏的缺口 | 中；Windows/容器、资源限制与工具兼容性 | P2 独立升级，不绑定整套 Harness |
+| approval escalation | 低 | 中；外部/不可逆工具启用后必要 | 中；涉及人机交互和策略语义 | 工具范围扩大时启动 |
+| MCP、通用 plugin、tool search | 当前低 | 中高；大工具表时有价值 | 中高；扩大攻击面和验证范围 | deferred |
+| dynamic subagent、background jobs、并发调度 | 当前低 | 长周期/通用任务时高 | 高；改变角色、状态和评测语义 | deferred，按任务需求触发 |
+| OpenTelemetry/Web UI | 低 | 中；利于产品化和演示 | 低到中 | 求职/产品化支线，可选 |
+
+### 13.4 Harness 试验的启动条件与停止 Gate
+
+只有出现以下至少三项需求，才重新评估 DeepSeek Harness 或同类通用底座：
+
+- 允许模型执行任意 shell/code，而不再只是六个安全绑定工具；
+- 工具表扩大到需要动态搜索、MCP 或插件生命周期管理；
+- 需要多 session、多用户、后台 job、cancel、durable resume 或远程 worker；
+- 需要动态 subagent、父子 session 或跨产品 delegation；
+- 自研 session/sandbox/plugin 维护成本持续超过领域研究成本；
+- 候选 Harness 已进入稳定发布，并能给出明确的 Python/EO 工具集成路径。
+
+若触发评估，只允许在独立分支做最小技术验证：一条普通 NDVI parity 和一条 task-11 故障恢复
+parity。原型不得修改 v0.5.3 工件、panel 或 gold，也不自动进入论文证据。只有同时满足以下 Gate
+才允许提出迁移计划：
+
+1. `RunRequest/RunResult`、typed plan、delivery obligations 和两类图语义保持兼容；
+2. 相同任务没有新增 false-success，且 v2 evaluator closure 不下降；
+3. 获得可验证的进程隔离、持久化或维护成本收益，而不只是更换框架名称；
+4. 自定义跨语言胶水和重复状态明显少于被替换代码；
+5. 新依赖版本、回滚办法、预算和需重跑的证据范围得到单独批准。
+
+任一 Gate 不满足即终止原型，继续使用自研 runtime 和现有 adapter。
+
+### 13.5 Brain、Context、Memory 与 Knowledge 的升级边界
+
+第一章不新增“长期记忆”创新 claim。当前 `state.json`、AutoGen team state、plan history、observation、
+artifact、trace 和两类图属于单 run 工作记忆与可持久化 episodic record；因为它们尚未被跨 run 检索
+并影响新决策，所以不得称为完整的长期经验记忆。
+
+后续将旧图中的 `Knowledge & Memory` 分为两个语义面：
+
+- `Context & Run Memory`：当前任务状态、计划、消息、observation、artifact 摘要、checkpoint；
+- `Scientific Knowledge & Evidence`：文献、规范、传感器/方法适用条件、case bank、知识图谱和证据来源。
+
+物理存储可以复用，但 schema、权限、更新与 provenance 必须分开。跨 run memory 只有在出现重复用户、
+长周期任务或可检索历史经验的明确研究问题后才启动；“保存了 trace”本身不构成 memory effectiveness。
+
+外部知识接入沿第 10.3 节已经冻结但尚未实现的 `ScientificConstraintPort` 推进。第一版只实现
+版本化 contract/evidence adapter 和 NoOp/Fake/受审查 provider，不直接引入自主写回知识库；任何
+历史 episode 产生的知识更新只能成为 `CandidateUpdatePacket`，进入 quarantine/review 后再 admission。
+
+### 13.6 Benchmark 路线
+
+评测分为四层，互不冒充：
+
+1. **Regression suite**：维持 v0.5.3 的 121 项测试及 clean-environment/CLI/privacy gate，验证编码
+   合同是否继续生效；
+2. **Mechanism benchmark**：冻结当前 v2 5×3，作为规划约束、正确停止、局部修订、checkpoint、
+   trace/graph 和 false-success 的初步 matched evidence；
+3. **Historical/admission benchmark**：保留原论文 20 请求及 modern admission gold，用于支持/澄清/
+   缺工具/科学拒绝分类，不启动当前六工具条件下的 20×1 live；
+4. **Formal end-to-end benchmark**：由 Chapter 3 另行设计多任务、多数据、baseline、fault family、
+   科学/空间结果、成本与人工校准。只有这一层用于稳定效果和外部有效性结论。
+
+未来如对齐 ThinkGeo 等公开遥感 agent benchmark，只选择能明确映射当前数据与工具语义的子集，记录
+适配差异；不得为了通用 leaderboard 扩大第一章工具范围或改变核心研究问题。
+
+### 13.7 分阶段执行安排
+
+#### P0：开题与面试表达（现在开始，尽量不改核心代码）
+
+- 更新三张唯一 Mermaid 图：领域功能、角色责任、规划—执行—反馈—恢复；
+- 增加一张仅用于面试/PPT 的“ExpertsRS 与现代 Harness 能力矩阵”；
+- 统一 Brain、Hands/Tools、Data、Runtime、Evaluation、Context、Memory、Knowledge 术语；
+- 修正文档中仍把 v0.5.3 写成未完成的旧状态，不重写历史审计事实；
+- 形成一页系统说明、三分钟/十分钟项目陈述和 claim-safe 问答；
+- Harness 采用 ADR 已完成；后续新增 Memory/Knowledge 边界 ADR，本节作为其决策来源。
+
+#### P1：第一章后的低风险架构卫生（3–9 个月，Agent 主执行）
+
+- 抽取 `DecisionProvider`，保留 AutoGen 0.7.5 adapter，并增加 direct OpenAI-compatible adapter；
+- 抽取 `ExecutionBackend`，保留当前 `LocalInProcessBackend` 行为；
+- 设计版本化 `EventStore`，先让 observed graph/evaluator export 从事件 projection 读取；
+- 增加 schema migration/round-trip/parity tests；只有模型可见上下文或终态语义变化才重跑 live pilot；
+- 不在此阶段增加角色、工具、长期记忆、MCP 或动态 subagent。
+
+#### P2：Chapter 2 知识与科学约束（约 1 年）
+
+- 实现 `ScientificConstraintPort`、contract bundle、evidence locator 和 constraint decision；
+- 接入可引用的文献/规范/案例检索，评价 recall、rerank、evidence coverage、冲突和 freshness；
+- 在计划 admission、observation 后复核和报告降级三个固定点接入，不创建第二套调度器；
+- 保持 serving knowledge 与 candidate learning state 分离。
+
+#### P3：Chapter 3 正式验证（约 1–2 年）
+
+- 建立多任务、多场景、多故障 benchmark 和独立 gold/private evaluator；
+- 加入旧对话流程、单 Agent、静态 graph、结构化 URSA 等 baseline/ablation；
+- 评价完成/正确停止、恢复局部性、重算、证据闭合、科学精度、成本和人工结果质量；
+- 只有任务设计确实需要时，才加入跨 run episodic memory 或用户 profile memory 条件。
+
+#### P4：产品化/求职增强支线（不阻塞论文）
+
+- 独立进程或容器 sandbox、资源配额、网络策略和 approval；
+- durable session、jobs/cancel、OTel、Web UI、MCP 和可选 Harness/MAF adapter；
+- 每项都以可演示收益和 parity test 为 Gate，不以“采用最新框架”本身作为完成标准。
+
+### 13.8 人类与 Agent 的责任分配
+
+| 责任 | 研究者主导 | Agent 主执行 |
+| --- | --- | --- |
+| 研究 | 问题、假设、novelty、baseline、claim boundary | 文献/代码事实核对、候选对照矩阵、草稿整理 |
+| 科学 | EO 适用性、gold、主题/空间结果、专家校准 | 数据检查脚本、重复计算、provenance 与表格 |
+| 架构 | 最终术语、边界和是否接受迁移 | ADR/接口草案、代码重构、parity/regression tests |
+| 证据 | 决定哪些结果可进入论文与答辩 | runner、manifest、checksum、trace 分析和图表生成 |
+| 表达 | 开题/PPT/面试主线与现场判断 | Mermaid、讲稿初稿、不同长度版本和一致性检查 |
+
+默认工作方式是：研究者决定研究边界、科学判断和最终叙事；Agent 在已批准边界内完成小模块升级、
+回归、文档、图表和证据整理。任何会改变模型上下文、工具可达性、终态语义或正式实验条件的升级，
+必须先形成独立迁移计划并获得批准。

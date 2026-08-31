@@ -4,6 +4,11 @@
 > 分层规划、随执行更新的过程图、基于检查点的局部恢复”。代码类名或字段名只在反引号中出现，
 > 不自动成为论文术语。
 
+> 2026-08-29 current-state note：下方 D1/D2 资产映射保留为历史设计 provenance；当前实现与证据
+> 状态以本节“内部架构映射”、`claim_registry.md` 和 `v053_evidence_index.md` 为准。v0.5.3 已完成
+> 统一 live runtime、121/121 回归和一次 15/15 v2 evaluator closure 的 5×3 pilot，但正式机制效果
+> 与科学准确性仍未得到证明。
+
 ## 内部架构映射
 
 | 对象 | 当前实现 | 证据角色 | 客观缺口 | 允许表述 |
@@ -12,22 +17,22 @@
 | v2 交付闭合 | runtime-owned `DeliveryObligation`、Manager structured deliverables、v2 evaluator | live engineering evidence | 仅受支持规则与单场景 | 原始请求不能被 Scientist 的 requested_outputs 静默删减 |
 | ProfiledUserAgent | 一次性规则/live clarification fixture | isolated integration evidence | 非常驻角色、非用户研究 | 证明 `.resume()` 闭环，不证明用户效用 |
 | 18-tool layer | 四个 kit、registry、schema、结构化返回、semantic band resolver | engineering | 依赖只设下限、未冻结环境；多传感器语义覆盖有限 | 建立了带 fail-closed 科学前置条件的统一工具表面 |
-| `TaskSpec` | goal、AOI/time、expected outputs、constraints 等 | engineering | 无 schema version/round-trip test；尚未由 LLM 稳定生成 | 实现了最小 typed task object |
+| `TaskSpec` | goal、AOI/time、expected outputs、constraints；真实 Scientist 输出完整 typed task/plan | live engineering | 只覆盖冻结请求与 schema；不证明任务理解普遍正确 | 实现并在 v0.5.3 live runtime 使用最小 typed task object |
 | `OperatorSpec` | 18 adapters、typed input/output、required bands/config、precondition、failure/default | engineering | 类型仍粗；缺 graph-level CRS、resolution、extent 与完整 sensor ontology | 为现有工具建立 versioned minimal contracts |
 | static `WorkflowGraph` | artifact dependency 与 ordered nodes | engineering | 是 upfront graph；未与 live observation loop 贯通 | 已实现静态数据依赖图；当前定位为 baseline/中间资产，不是最终中心 |
 | validator | unknown/missing/type/order/file/output、required band/config 与 output contract 检查 | engineering + diagnostic | CRS/transform 当前在执行工具检查；缺 graph-level geometry/extent/resolution/QA 与系统化参数范围 | 实现 deterministic pre-execution structure + selected EO semantic checks |
 | targeted repair | 单一 missing output 且唯一 candidate 时补一个 node | engineering + diagnostic | 不是 observation-driven replanning；candidate uniqueness 依赖粗类型 | 已实现 deterministic repair baseline，不升级为一般恢复能力 |
 | controlled stop | blocking/ambiguous/unsupported 时停止并记录 | engineering + diagnostic | 没有 ask-user/replan 的 live integration | 对不支持情形显式停止，不隐藏改写 |
 | `WorkflowTrace` | 旧事件 payload + 稳定事件编号、顺序、责任者、对象和类型化引用 | engineering + diagnostic | 缺 schema/model/tool/data version 与 replay runner | 已形成兼容旧路径的统一运行事实外壳 |
-| ReAct routing | AG2/AutoGen GroupChat + 项目 selector/executor 分离、observation return、预算 | engineering | ReAct 是通用模式；尚未与 typed runtime 串成 live path | 改善原型交互语义与可观测性；不是独立创新 |
-| 分层检查责任 | Manager 用户确认、Scientist/Engineer 责任、固定规则检查、独立评测已有部分资产 | design-frozen support | 尚无执行前/后/结束时的统一编排；无按需审核器约定 | 检查责任已分层定义；不声称已实现常驻审核 Agent 或验证一切结果 |
-| 权限检查接口 | 18-tool effect 表、本地默认拒绝 policy、允许/拒绝记录；唯一 Executor 仍是执行入口 | implemented-interface | 尚未把 policy 强制接入所有 live ReAct 调用；无确认流、企业身份与隔离 | 已实现第一章最小接口，不称完整权限系统或创新点 |
-| 可修改的计划 | 不可变计划版本记录总体目标、阶段、下一动作、父版本、触发反馈与恢复检查点 | implemented-no-api | 由 fixture 构造，尚未由真实 Scientist 稳定生成/修改 | 已实现最小表示和单一故障修订，不称规划效果提升 |
-| 随执行更新的过程图 | 纯函数从运行事实确定性整理计划、权限、动作、反馈、产出、检查点与改道关系 | implemented-no-api | 当前是紧凑 JSON，无 live-Agent 查询/反思与 schema version | 已实现审计接口，不是先验硬剧本或图数据库 |
-| 基于检查点的局部恢复 | 逻辑检查点引用恢复位置和有效产出；故障 fixture 保留失败路径并复用元数据 | implemented-fixture-narrow | 单一注入故障；不可逆动作不能撤销，无通用分支搜索 | 已实现最小局部恢复，不称自我学习 |
+| ReAct routing | AutoGen AgentChat 角色会话 + 项目 runtime 的计划/动作/observation 路径 | live engineering | ReAct 是通用模式；角色会话与运行事实的组合不是独立创新 | 保留角色语义与真实反馈，不把框架或 ReAct 包装为贡献 |
+| 分层检查责任 | Manager/Scientist/Engineer 责任、runtime 固定规则、外部 v2 evaluator | implemented support | 规则不能判断完整科学适用性；无通用语义审核器 | 已实现执行前/后/结束闭合和标准答案隔离，不称验证一切结果 |
+| 权限检查接口 | 允许工具、eligible node、默认拒绝 policy、唯一 Executor | live implemented-interface | 只覆盖本地路径/冻结工具；无企业身份、容器和多租户隔离 | 已接入 v0.5.3 live runtime，不称完整权限或进程沙箱 |
+| 可修改的计划 | 真实 Scientist 维护完整版本图、父版本、触发 observation、影响范围和 checkpoint 引用 | supported-live-narrow | task-11 为 `local_reauthorization_only`；不证明生成更优路径 | 已证明 observation 后局部重新授权，不称规划效果提升 |
+| 随执行更新的过程图 | planned graph 按版本保存，observed graph 从 trace 重建并带稳定引用 | supported-live | 图主要用于审计与评测；未证明反馈图提高模型决策 | 已形成事实型过程图，不是先验硬剧本或图数据库 |
+| 基于检查点的局部恢复 | 运行检查点引用有效产物；task-11 复用 NDVI 后完成受影响分支 | supported-live-narrow | 单一批准故障；不可逆动作不能撤销；无 durable recovery | 已证明运行内局部复用与重新授权，不称通用恢复 |
 | broad runtime branch | state/checkpoint/artifact/evaluator/provenance | engineering exploration | side branch、deterministic nodes、未并入 current method | 作为设计探索和候选资产，不作为当前完成度 |
-| P0--P3 | 文档设计 | design only | 尚无 matched tasks/runs/statistics/error analysis | 只能说“已设计”，不能说“有效” |
-| D3 direct 模型调用适配器 | 手写 OpenAI-compatible REST + 单步 JSON 解析 | engineering preparation | 不是 AutoGen/AG2 调度，runner 仍以 task/phase 推进；不得作为 live multi-agent D3 执行器 | 只可称模型调用与脱敏边界准备；真实 D3 需 AG2–runtime bridge |
+| v2 5×3 pilot | 冻结 5 任务 × 3 条件、真实模型、外部 v2 evaluator、独立 run artifacts | live integration evidence | 单轮、小面板，不是正式效果或外部效度实验 | 15/15 closure 与 5/7/3 终态可报告；不能称成功率或规划提升 |
+| live model adapter | AutoGen AgentChat 0.7.5 / OpenAI-compatible provider，经统一 runtime 生成结构化角色决策 | live engineering | 框架生命周期与模型变化不构成论文因变量 | 说明当前技术实现；不把 AutoGen 或 provider 当方法创新 |
 
 ## D1 资产映射（2026-08-10）
 
@@ -165,8 +170,9 @@ ReAct、科学前置条件、benchmark 与新增接口测试通过。
 > 随执行更新的过程图和检查点局部恢复组织成一个闭环，并研究它相比旧对话流程和静态预先
 > 规划，是否让开放遥感任务更容易执行完成、从失败中恢复并接受追溯检查。
 
-三个研究对象当前只是“设计已冻结”，不是“已经实现”；只有同任务对照证据才能进一步证明
-有效。自然语言交互、角色分工、ReAct、图、运行记录、检查点和工具注册均不能单独作为创新点。
+三个研究对象已经在统一 live runtime 中形成小规模集成证据，但只有正式 baseline/ablation 才能
+进一步证明效果。自然语言交互、角色分工、ReAct、图、运行记录、检查点和工具注册均不能单独
+作为创新点。
 
 ## 当前最强反对意见
 
@@ -176,7 +182,9 @@ ReAct、科学前置条件、benchmark 与新增接口测试通过。
    对照实验来证明。
 3. **“ReAct + 多 Agent 是标准拼装。”** 同意；ReAct 只作为系统支撑，不列为论文核心创新。
 4. **“最初 pilot 不是正确 NDVI，如何谈可靠性？”** 保留原始降级记录，并展示问题如何被转为 semantic contracts 与 regression fixtures；新 pilot 只证明编码前置条件和链路，不声称 thematic accuracy。
-5. **“typed workflow 与 live LLM 没有接通。”** 属实；当前是 method kernel 与 orchestration surface 两个通过测试的部件，不是 live-LLM end-to-end evidence。
+5. **“typed workflow 与 live LLM 没有接通。”** 该问题已由 v0.5.3 解决：真实 Scientist 计划、
+   plan-bound action、工具反馈和报告闭合进入统一 runtime；剩余反对意见是小面板集成通过不能证明
+   方法效果或跨任务泛化。
 6. **“这只是 ReAct + 日志 + checkpoint。”** 单项确实都是已有思想；只能通过遥感任务中的
    操作定义、失败家族、可恢复状态边界和 matched results 证明组合是否形成领域方法贡献。
 

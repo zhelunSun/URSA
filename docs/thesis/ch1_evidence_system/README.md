@@ -4,22 +4,44 @@
 
 ## 人类快速面板
 
-| 项目 | 当前结论（2026-08-11） |
+| 项目 | 当前结论（2026-08-27） |
 | --- | --- |
-| 一句话主线 | 面向用户的多智能体遥感系统，让开放需求随真实工具反馈动态调整、可恢复、可追溯，并交付可理解结果 |
+| 一句话主线 | 面向非遥感专业用户的开放式城市森林需求，构建能够保持用户意图、组织专业数据与工具，并依据运行反馈可靠完成任务的多智能体遥感工作流 |
 | 三个候选创新 | ① 可调整的分层规划；② 随执行更新的过程图；③ 基于检查点的局部恢复 |
 | 最小架构图 | 只维护三张：系统模块概念图、多智能体责任图、规划—执行—反馈—恢复闭环图；唯一源见 `module_continuity_map.md` |
-| 已经做成 | 静态工作流、18 个工具约定、规则检查、有限修补/停止、ReAct 工具反馈循环、运行记录，以及 D2 无 API 小样中的计划版本、过程图、检查点局部恢复和越界拒绝 |
-| 还没有做成 | 真实 LLM 生成/修改计划的同任务对照、正式效果指标、企业级权限和通用恢复能力 |
+| 已经做成 | 唯一 run/resume、真实模型结构化 planned graph、plan-bound action、规则/权限/预算、真实工具 observation、Scientist 局部重新授权、planned/observed graph、运行内 checkpoint、交付义务与报告闭合 |
+| 已有初步实验 | v0.5.3 主/clean 环境 121/121；最终 v2 5×3 为 15/15 evaluator closure；另有 rule/live UserAgent clarification-resume smoke |
+| 还没有做成 | 规划优越性和 checkpoint 独立效应、科学/空间结果精度、跨任务/跨传感器泛化、进程沙箱、durable recovery 与生产级通用 Harness |
 | D1 结论 | 主线代码继续使用；旧运行时旁支只借少量编号、清单和调用统计；不合并固定六步流程，不增加审核/报告 Agent，不采用旧波段规则 |
-| 当前决定 | 三条原则已于 2026-08-10 获研究者认可；D2 无 API 最小机制已于 2026-08-11 跑通，真实模型比较仍放到 D3 |
+| 当前决定 | v0.5.3/`0efd090` 作为冻结研究基线；当前转入章节写作、三张图、结果可视化和面试表达，不整体迁移 DeepSeek Harness |
 | 明确延期 | 新 Agent、完整企业权限、容器/云部署、遥感服务标准接入、跨系统 Agent 通信、分布式运行时 |
 
 三章边界：第一章保证工作流能够安全、完整、可追溯地运行；第二章判断方法与结论是否有科学
 知识和证据依据；第三章独立评价完整系统在真实任务和用户层面是否可靠、有用。
 
-人类阅读顺序只需：本面板 → `scope_gate.md` → `narrative_cards.md`。需要审计某个 claim 时，
+人类阅读顺序只需：本面板 → `ch1_v053_draft.md` → `module_continuity_map.md` → `narrative_cards.md`。需要审计某个 claim 时，
 再进入 architecture/claim/evolution/audits；不要求日常通读全部文件。
+
+## 总 Idea 仓库对接清单
+
+`research-harness` 只保存跨仓指针和人工接受后的证据状态，不复制本目录内容。总库访问第一章时
+按用途读取以下稳定文件：
+
+| 用途 | 首选文件 | 状态与边界 |
+| --- | --- | --- |
+| 更新中文大论文提纲 | [`ch1_v053_draft.md`](ch1_v053_draft.md) | 写作骨架；不单独晋级 claim |
+| 理解领域动机与系统演化 | 本文件、[`module_continuity_map.md`](module_continuity_map.md) | User-centric RS → URSA Harness；三张图语义主源 |
+| 制作 PPT/面试陈述 | [`narrative_cards.md`](narrative_cards.md) | 30 秒、90 秒、五页骨架与常见追问 |
+| 引用实验数字 | [`v053_results_table.md`](v053_results_table.md) | 只报告冻结 5×3 的终态、token、wall time 与 claim boundary |
+| 定位运行与 checksum | [`v053_evidence_index.md`](v053_evidence_index.md) | v0.5.3 evidence package 的权威指针 |
+| 审核允许/禁止表述 | [`claim_registry.md`](claim_registry.md) | 使用稳定 claim ID；先看当前状态和限制 |
+| 审核架构—代码—证据关系 | [`architecture_claim_matrix.md`](architecture_claim_matrix.md) | 顶部为当前状态；D1/D2 长表为历史 provenance |
+| 获取图源与渲染件 | [`figures/README.md`](figures/README.md)、[`figures/out/`](figures/out/) | 三张系统图；当前为开题/PPT 可用草案，终稿仍需版面检查 |
+| 查看完整开发边界 | [`PLAN.md`](PLAN.md) | 工程计划与长期 backlog；不是明日写作入口 |
+
+从总 Idea 仓库进入时只需要
+`research-harness/thesis/README.md → 本清单 → 对应材料`。若只准备开题，默认读取前六行，不扫描
+raw runs、历史 audit 或 `PLAN.md` 全文。
 
 `D1/D2/D3` 只是执行阶段编号，不是研究概念：D1 是资产盘点，D2 是无 API 最小贯通，D3 是
 真实模型对照。以后人工汇报首次出现这些编号时必须同时写出中文含义。
@@ -155,20 +177,18 @@ python scripts/ch1_materials_snapshot.py
 
 ## 当前人工门槛
 
-截至 2026-08-10，带明确类型的静态工作流、规则检查、有限修补/停止、过程记录与 ReAct 路由的最小软件机制已经形成；独立审计发现的波段对应、无效值处理、工具适配签名与 Sentinel-2 地表温度前置条件也已经修复并复核。这些资产现在被明确定位为可复用的实现基线，而不是最终方法本身。
+截至 2026-08-27，v0.5.3 已把 typed planned graph 与真实模型决策、plan-bound action、真实工具
+observation、Scientist revision、observed graph、运行内 checkpoint 和 delivery closure 接入统一
+runtime。最终代码基线为 `0efd090`；主环境与 clean-venv 均为 121/121，最终 v2 5×3 为 15/15
+evaluator closure。这个结果证明冻结条件下的运行、正确停止、澄清和局部恢复证据可以闭合，不能
+推导规划优越性、checkpoint 独立效应、行政区绿地覆盖率、主题精度或跨任务泛化。
 
-研究者已经接受第一章的设计冻结：保留原有端到端自然语言分析架构，把方法增量收束为三个研究对象——可调整的分层规划、随执行更新的过程图，以及基于检查点的局部恢复。规划表达下一步准备怎样做；执行产生真实动作、观测和结果；过程图保存两者及其修改关系，用于检查、解释和继续思考，而不是要求系统一开始把流程写死。2026-08-11 已用无 API、真实工具故障小样贯通三个对象，但尚未把它们接入真实模型对照，因此当前状态应写成：
+当前状态统一写成：
 
-> **静态软件基线与 D2 最小自适应闭环已在本地闭合；真实模型集成和正式效果证据仍待完成。**
+> **URSA 已从 conversation-oriented prototype 演化为 domain-specific、evidence-first research
+> harness；第一章工程与初步集成证据已收口，下一步重点是科学问题、章节文本、三张图、结果图和
+> 面试叙事，而不是继续扩建通用平台。**
 
-新 pilot 只能作为“真实工具反馈能够触发计划修改、过程图重建、检查点复用和越权拒绝”的机制证据。`B99` 是明确标注的故障注入，成功重试的 `B8/B4` 只证明既有科学前置条件可执行；两者均不得用于证明分类精度、真实模型可靠性提升或一般化效果。下一步只进入压缩的 D3-light 真实模型同任务对照，不扩建工具本体、角色、界面、知识库、分布式运行时或第二章科学约束。源码由本次 Git baseline 固定，结果工件继续由入口重建并保持忽略。
-
-同日，D3-light 已从原 20 条中原样抽取 ID 2、3、10、11、13，覆盖正常完成、工具缺失、数据
-前置条件停止、多步恢复和用户澄清五种运行角色。任务合同与 Agent 输入已隔离并通过无泄漏
-测试，但尚未选择模型、采样参数和预算，也未授权 API 调用。15-run 首轮只作集成 smoke；是否
-升级到 45-run 重复实验必须根据首轮成本和稳定性另行决定。
-
-2026-08-12 的真实模型接入准备只新增一个“模型调用接口”：它让 Manager、Scientist 或 Engineer
-在各自阶段返回受限的下一步 JSON；本地 Executor 仍执行已注册工具，系统外 evaluator 仍独立
-评分。接口在 API 双门禁关闭时会在任何网络请求之前拒绝。未来授权只涵盖指定模型、15 次 smoke
-上限、固定预算与有限文本外发边界；不外发栅格、路径、评分答案、fixture 标记或密钥。
+当前人工 Gate 是确认章节主问题、贡献层级和可视化草案。任何新增 live 实验、工具、角色、长期
+记忆、通用插件、进程沙箱或框架迁移都不自动启动；只有其能回答新的研究问题，并形成独立计划、
+预算、版本和证据 Gate 后才实施。
