@@ -1,0 +1,28 @@
+flowchart LR
+    subgraph INTENT["用户需求与规划"]
+        direction TB
+        I["经 Manager 确认的用户需求"] --> OBL["原始需求交付义务"]
+        OBL --> P["Scientist 提交完整计划图"]
+    end
+    subgraph EXECUTION["受控执行"]
+        direction TB
+        A["Engineer 选择<br/>当前可执行节点"] --> C{"运行时检查<br/>规则 · 权限 · 预算"}
+        C -->|"通过"| X["Executor 真实执行"]
+        X --> O["真实工具反馈与产出"]
+        O --> V{"执行结果检查"}
+    end
+    subgraph EVIDENCE["反馈与证据"]
+        direction TB
+        K["运行检查点<br/>有效产出引用"] --> G["事实过程图<br/>由运行记录重建"]
+        G --> D{"是否满足任务<br/>与交付条件"}
+    end
+    P --> A
+    C -->|"拒绝或需确认"| Q["受控停止 · 请求澄清<br/>或要求修订"]
+    V -->|"通过"| K
+    V -->|"失败"| F["保留失败事实"]
+    F --> G
+    Q --> G
+    F --> H["Scientist 修订<br/>局部重新授权"]
+    H --> P
+    D -->|"继续"| P
+    D -->|"完成"| M["Manager 解释并交付结果"]

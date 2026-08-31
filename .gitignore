@@ -49,5 +49,9 @@ earthengine
 !ExpertsRS/evaluation/ch1/
 !ExpertsRS/evaluation/ch1/*.json
 
+# Reproducible Chapter 1 figure theme (reviewed, non-credential JSON)
+!docs/thesis/ch1_evidence_system/figures/theme/
+!docs/thesis/ch1_evidence_system/figures/theme/*.json
+
 # WorkBuddy private state (memory, automations)
 .workbuddy/
