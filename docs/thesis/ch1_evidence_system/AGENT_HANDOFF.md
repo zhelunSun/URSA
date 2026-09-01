@@ -10,10 +10,10 @@ legacy/new-system boundary.
 
 ## Safe starting point
 
-- Branch: `codex/ch1-unified-runtime`.
-- Branch relationship: it is two commits ahead of
-  `codex/ch1-baseline-20260811` (`64bfbdc`); the baseline and historical
-  notebook remain unchanged.
+- Canonical branch: `codex/ch1-v2-e1-structured-planning`.
+- The old `codex/ch1-unified-runtime` and `codex/ch1-baseline-20260811`
+  relationship is historical provenance, not the current execution entry.
+  Protected notebook and v0.5.3 closeout milestones remain unchanged.
 - New-system authority: `ExpertsRSSystem.run()` / `.resume()` and
   `python -m ExpertsRS` from repository root.
 - Historical notebook: `ExpertsRS/ExpertsRS_notebook.ipynb`; keep it intact.
@@ -38,8 +38,11 @@ legacy/new-system boundary.
 ## Required checks before a handoff
 
 ```powershell
-python -m unittest discover -s ExpertsRS -v
-python -m compileall -q ExpertsRS
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m compileall -q ExpertsRS
+.\.venv\Scripts\python.exe ExpertsRS\run_m1_closeout.py
+.\.venv\Scripts\python.exe ExpertsRS\run_d2_closeout.py
+git lfs fsck --objects
 git diff --check
 ```
 

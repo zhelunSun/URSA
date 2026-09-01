@@ -21,6 +21,27 @@ URSA paves the way towards more accessible, interactive, and intelligent remote 
 
 ## 🚀 Prototype: ExpertsRS
 
+### Reproducible development environment
+
+Use a repository-local virtual environment; do not install the research
+runtime into the global Python environment. From the repository root on
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe ExpertsRS\run_m1_closeout.py
+.\.venv\Scripts\python.exe ExpertsRS\run_d2_closeout.py
+git lfs fsck --objects
+```
+
+The current canonical Windows verification is 121 passing tests plus both
+no-API closeout commands. Provider credentials are not required for this gate.
+Git LFS authentication is still required when restoring the Sentinel-2 raster
+on a new machine.
+
 As an initial demonstration of the URSA framework, we developed **ExpertsRS** — a prototype system that showcases how user-centric remote sensing analysis can be enabled through a Large Language Model (LLM)-powered multi-agent system.
 
 ExpertsRS is built based on [AutoGen](https://github.com/microsoft/autogen), and implements a flexible workflow where multiple AI agents interact to support users in remote sensing analysis tasks.
