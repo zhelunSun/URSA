@@ -15,6 +15,7 @@ NOTEBOOK = Path("ExpertsRS/ExpertsRS_notebook.ipynb")
 EARLIEST_NOTEBOOK_REF = "19db55bf2a819e8b07722233330d1b541bd3f764"
 PUBLISHED_STYLE_NOTEBOOK_REF = "878e84b4fa7098df837aa92101ca595e11fb3f73"
 RUNTIME_BRANCH = "origin/codex/ch1-runtime-foundation"
+BASELINE_BRANCH = "origin/main"
 
 
 def git(*args: str, check: bool = True) -> str:
@@ -101,7 +102,11 @@ def build_snapshot() -> str:
     current_nb = json.loads((REPO / NOTEBOOK).read_text(encoding="utf-8"))
     original_nb = git_object_json(EARLIEST_NOTEBOOK_REF, NOTEBOOK)
     runtime_exists = bool(git("show-ref", "--verify", f"refs/remotes/{RUNTIME_BRANCH}", check=False))
-    runtime_commits = git("rev-list", "--count", f"main..{RUNTIME_BRANCH}") if runtime_exists else "0"
+    runtime_commits = (
+        git("rev-list", "--count", f"{BASELINE_BRANCH}..{RUNTIME_BRANCH}")
+        if runtime_exists
+        else "0"
+    )
 
     tool_files, tool_lines = python_surface(REPO / "ExpertsRS/tools")
     workflow_files, workflow_lines = python_surface(REPO / "ExpertsRS/workflow")
@@ -157,7 +162,7 @@ was not touched by the M1 sidecar upgrade” from “the notebook was never chan
 
 | Surface | Python files | Lines | Repository state |
 | --- | ---: | ---: | --- |
-| standardized tools | {tool_files} | {tool_lines} | tracked on `main` |
+| standardized tools | {tool_files} | {tool_lines} | tracked on `{BASELINE_BRANCH}` |
 | typed workflow | {workflow_files} | {workflow_lines} | inspect `git status` above |
 | ReAct/closeout entry points | {len(existing_react)} | {react_lines} | inspect `git status` above |
 | broad runtime exploration | branch | {runtime_commits} commits ahead of `main` | `{RUNTIME_BRANCH}`; not merged |
