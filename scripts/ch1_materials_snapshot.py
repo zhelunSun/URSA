@@ -165,7 +165,7 @@ was not touched by the M1 sidecar upgrade” from “the notebook was never chan
 | standardized tools | {tool_files} | {tool_lines} | tracked on `{BASELINE_BRANCH}` |
 | typed workflow | {workflow_files} | {workflow_lines} | inspect `git status` above |
 | ReAct/closeout entry points | {len(existing_react)} | {react_lines} | inspect `git status` above |
-| broad runtime exploration | branch | {runtime_commits} commits ahead of `main` | `{RUNTIME_BRANCH}`; not merged |
+| broad runtime exploration | branch | {runtime_commits} commits ahead of `{BASELINE_BRANCH}` | `{RUNTIME_BRANCH}`; not merged |
 
 ## Dataset semantic check
 
