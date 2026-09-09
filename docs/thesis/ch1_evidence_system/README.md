@@ -3,6 +3,7 @@
 > **2026-09-09 操作入口校准：**正式工作副本为 `D:/Projects/phd-thesis/URSA`；
 > `D:/Projects/phd-research/ch1-agent-workflow` 仅作恢复比较。冻结研究基线为 v0.5.3；
 > `codex/ch3-domain-toolchain` 开发分支为 v0.5.4.dev0，阶段范围见 [领域工具链](domain_toolchain_stage.md)。
+> 北京离线产品链的完成情况和可复核证据见 [阶段验收](audits/20260909_domain_toolchain_closeout.md)。
 > 本轮代码、环境、实验可用性与后续操作见 [系统检查](audits/20260909_repository_system_check.md)。
 > 9 月 7 日会后分工以总控 `THESIS_STATE.md` 为准：第一项承担需求解析与工作流方法，
 > 第二项承担知识表示与推理，第三项承担领域系统构建与应用验证；下方旧三章分工保留历史语境。
