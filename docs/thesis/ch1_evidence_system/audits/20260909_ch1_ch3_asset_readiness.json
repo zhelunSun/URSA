@@ -1,0 +1,57 @@
+{
+  "kind": "ch1_ch3_readonly_preparation",
+  "checked_on": "2026-09-09",
+  "ursa_code_commit": "50c5f658f320cf8af38a4539c87ab923afc71b3f",
+  "ch3_code_commit": "943d8878a41eb7ed206177cc9188184b896fad95",
+  "task_card_sha256": "33127cad36a2a63f4dfcc46a2af91ec434e82614d2bc90d03309e0c955c0651e",
+  "raster": {
+    "path": "data/processed/rf_maps/routeb_h07_cs8k_strict500_seasonal17_v2_20260708/beijing_rf_routeb_h07_cs8k_strict500_seasonal17_v2_full_2025_20260708.tif",
+    "exists": true,
+    "expected_sha256": "fe89f6069f6cbd8d443c2ad249babd66b76f94653af63c1c6e6ae85f0deee369",
+    "actual_sha256": "fe89f6069f6cbd8d443c2ad249babd66b76f94653af63c1c6e6ae85f0deee369",
+    "hash_matches": true
+  },
+  "aoi_components": [
+    {
+      "path": "data\\aoi\\bejing_urban_forest_bound\\BJuforebv4.shp",
+      "exists": true,
+      "expected_sha256": "ad80561d9fdf9b122b5ac784b66c15d1d93e95c39854d4d90b0ef0eebfb498f2",
+      "actual_sha256": "ad80561d9fdf9b122b5ac784b66c15d1d93e95c39854d4d90b0ef0eebfb498f2",
+      "hash_matches": true
+    },
+    {
+      "path": "data\\aoi\\bejing_urban_forest_bound\\BJuforebv4.shx",
+      "exists": true,
+      "expected_sha256": "670f7918692ffe8fa111e9cff91a93ba348770f8a7c913cde7b86427ee994323",
+      "actual_sha256": "670f7918692ffe8fa111e9cff91a93ba348770f8a7c913cde7b86427ee994323",
+      "hash_matches": true
+    },
+    {
+      "path": "data\\aoi\\bejing_urban_forest_bound\\BJuforebv4.dbf",
+      "exists": true,
+      "expected_sha256": "c65bde307831e041813ef9b1bc685bb8873fa00da1f786291901e4f696d74cf5",
+      "actual_sha256": "c65bde307831e041813ef9b1bc685bb8873fa00da1f786291901e4f696d74cf5",
+      "hash_matches": true
+    },
+    {
+      "path": "data\\aoi\\bejing_urban_forest_bound\\BJuforebv4.prj",
+      "exists": true,
+      "expected_sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "actual_sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "hash_matches": true
+    }
+  ],
+  "ursa_environment_module_availability": {
+    "shapely": false,
+    "shapefile": false
+  },
+  "source_files": {
+    "ExpertsRS\\models.py": "5930a0cc28a7958798a4df72a3f376c23bee94014fa881a27cb93b89df8b9ccb",
+    "ExpertsRS\\system.py": "77ccd407dedfcf76181c0e54a8f3809e1f554e55d14556b41492591b329b3980"
+  },
+  "model_calls": 0,
+  "domain_tool_runs": 0,
+  "historical_live_reverified": false,
+  "scientific_validity": "not-assessed",
+  "next": "Isolated integration environment and public resource/tool adapter; evaluator reference withheld from solver."
+}
