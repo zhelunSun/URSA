@@ -53,6 +53,7 @@ class ProviderConfig(BaseModel):
     max_completion_tokens: int = Field(default=6_000, ge=1, le=100_000)
     max_retries: Literal[0] = 0
     cache_enabled: Literal[False] = False
+    enable_thinking: bool | None = None
 
 
 DEFAULT_RESEARCH_BUDGETS = RunBudgets()

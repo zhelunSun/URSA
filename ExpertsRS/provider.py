@@ -54,6 +54,8 @@ def create_autogen_live_provider(config: ProviderConfig) -> AutoGenSelectorDecis
             temperature=config.temperature,
             top_p=config.top_p,
             max_tokens=config.max_completion_tokens,
+            **({"extra_body": {"enable_thinking": config.enable_thinking}}
+               if config.enable_thinking is not None else {}),
             model_info={
                 "vision": False,
                 "function_calling": False,

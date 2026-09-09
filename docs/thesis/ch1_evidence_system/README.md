@@ -5,6 +5,7 @@
 > `codex/ch3-domain-toolchain` 开发分支为 v0.5.4.dev0，阶段范围见 [领域工具链](domain_toolchain_stage.md)。
 > 北京离线产品链的完成情况和可复核证据见 [阶段验收](audits/20260909_domain_toolchain_closeout.md)。
 > 后续工作入口：[能力校准与下一里程碑](industrial_calibration_20260909.md)、[通用 Agent 比较准备](comparison_preparation_20260909.md)。
+> 原型、升级与新领域链的实战证据分开定位，见 [实验谱系与当前 Flash 检查](experiment_lineage_20260909.md)。
 > 本轮代码、环境、实验可用性与后续操作见 [系统检查](audits/20260909_repository_system_check.md)。
 > 9 月 7 日会后分工以总控 `THESIS_STATE.md` 为准：第一项承担需求解析与工作流方法，
 > 第二项承担知识表示与推理，第三项承担领域系统构建与应用验证；下方旧三章分工保留历史语境。

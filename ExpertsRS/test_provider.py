@@ -155,6 +155,9 @@ class ProviderTests(unittest.TestCase):
             self.assertEqual(client_config["timeout"], config.timeout_seconds)
             self.assertEqual(client_config["max_retries"], 0)
             self.assertEqual(client_config["max_tokens"], config.max_completion_tokens)
+            self.assertNotIn("extra_body", client_config)
+            explicit = create_autogen_live_provider(config.model_copy(update={"enable_thinking": False}))
+            self.assertEqual(explicit.model_client._raw_config["extra_body"], {"enable_thinking": False})
             with patch("autogen_ext.models.openai.OpenAIChatCompletionClient", side_effect=RuntimeError("secret-value")):
                 with self.assertRaisesRegex(ProviderFailure, "RuntimeError") as captured:
                     create_autogen_live_provider(config)
@@ -181,6 +184,7 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(provider_manifest["max_completion_tokens"], 321)
         self.assertEqual(provider_manifest["max_retries"], 0)
         self.assertFalse(provider_manifest["cache_enabled"])
+        self.assertIsNone(provider_manifest["enable_thinking"])
 
     def test_provider_failure_preserves_partial_trace_without_fallback(self):
         class TimeoutProvider:

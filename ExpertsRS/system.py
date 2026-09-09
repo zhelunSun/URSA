@@ -1026,6 +1026,7 @@ class ExpertsRSSystem:
             "max_completion_tokens": request.provider.max_completion_tokens,
             "max_retries": request.provider.max_retries,
             "cache_enabled": request.provider.cache_enabled,
+            "enable_thinking": request.provider.enable_thinking,
             "provider_base_url_redacted": redacted_provider_base_url(request.provider),
             "api_calls_permitted": True,
             **ExpertsRSSystem._provenance_manifest(),
