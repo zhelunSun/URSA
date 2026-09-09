@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import tempfile
 import unittest
@@ -15,12 +16,50 @@ from ExpertsRS.evaluation.ch1.d3_light_protocol import build_case_slots
 from ExpertsRS.evaluation.ch1.d3_light_runner import run_unified_d3_case
 from ExpertsRS.evaluation.ch1.v2_evaluator import evaluate_v2_unified_run
 from ExpertsRS.user_agent import RuleProfiledUserAgent, run_one_clarification_loop
+from ExpertsRS.workflow.obligations import classify_graph_diff
 
 
 SCENE = Path(__file__).parent / "data" / "Sentinel2_Dongcheng_20230718.tif"
 
 
 class V2CloseoutTests(unittest.TestCase):
+    def test_revision_label_change_is_not_structural_but_execution_changes_are(self):
+        task, workflow = ScriptedDecisionProvider._workflow("greenspace", "Calculate green cover rate")
+        previous = {"task": task, "workflow": workflow}
+        renamed = copy.deepcopy(previous)
+        renamed["workflow"]["workflow_id"] = "green_cover_workflow_rev1"
+        self.assertEqual(classify_graph_diff(previous, renamed, is_revision=True), "local_reauthorization_only")
+        changed = copy.deepcopy(renamed)
+        changed["workflow"]["nodes"][-1]["depends_on"] = []
+        self.assertEqual(classify_graph_diff(previous, changed, is_revision=True), "structural_delta")
+        changed_scope = copy.deepcopy(renamed)
+        changed_scope["task"]["requested_outputs"] = []
+        self.assertEqual(classify_graph_diff(previous, changed_scope, is_revision=True), "output_scope_delta")
+
+    def test_renamed_revision_is_recorded_as_local_reauthorization(self):
+        class RenamingProvider:
+            def __init__(self):
+                self.delegate = ScriptedDecisionProvider()
+
+            async def decide(self, role, state):
+                decision = await self.delegate.decide(role, state)
+                if role == "Scientist" and decision.get("kind") == "revise":
+                    decision["workflow"]["workflow_id"] += "_rev1"
+                return decision
+
+        system = ExpertsRSSystem(
+            provider=RenamingProvider(),
+            executor=LocalToolExecutor(inject_failures={"apply_threshold": 1}),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run("Calculate green cover rate for Dongcheng", Path(directory), system=system)
+            planned = json.loads((Path(directory) / "v2" / "planned_workflow_graph.json").read_text(encoding="utf-8"))
+        self.assertEqual(result.status, RunStatus.COMPLETED)
+        versions = planned["plan_versions"]
+        self.assertEqual(len(versions), 2)
+        self.assertNotEqual(versions[0]["workflow"]["workflow_id"], versions[1]["workflow"]["workflow_id"])
+        self.assertEqual(versions[-1]["revision_change_class"], "local_reauthorization_only")
+
     def _run(self, request: str, destination: Path, *, system: ExpertsRSSystem | None = None):
         return asyncio.run((system or ExpertsRSSystem()).run(RunRequest(
             request=request, data_paths=[SCENE], output_dir=destination, run_id="v2",

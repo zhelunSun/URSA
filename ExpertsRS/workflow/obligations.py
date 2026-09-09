@@ -93,6 +93,14 @@ def classify_graph_diff(previous: dict[str, Any] | None, current: dict[str, Any]
         return "initial_plan"
     if previous.get("task") != current.get("task"):
         return "output_scope_delta"
-    if json.dumps(previous.get("workflow"), sort_keys=True) == json.dumps(current.get("workflow"), sort_keys=True):
+    # workflow_id labels the plan version, not an executable operation. Node
+    # identities, dependencies, inputs and configuration remain significant.
+    def executable_workflow(plan: dict[str, Any]) -> Any:
+        workflow = plan.get("workflow")
+        if not isinstance(workflow, dict):
+            return workflow
+        return {key: value for key, value in workflow.items() if key != "workflow_id"}
+
+    if json.dumps(executable_workflow(previous), sort_keys=True) == json.dumps(executable_workflow(current), sort_keys=True):
         return "local_reauthorization_only"
     return "structural_delta"

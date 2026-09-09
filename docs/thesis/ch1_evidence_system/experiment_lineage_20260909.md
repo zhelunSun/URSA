@@ -50,4 +50,51 @@ ProviderConfig 新字段默认 None，不改变旧模型默认参数；classific
 
 ## 当前运行回执
 
-待本轮三例实际运行后追加。源码/配置检查点必须先推送；结果仅以实际回执填写，不预填通过。
+已执行一次三例 live smoke，运行前源码/配置检查点 `bd03ed9549dc76ed8f82f1777a0d625c794245d6` 已推送。
+运行目录：`ExpertsRS/results/flash_runtime_20260909/baseline-01/`；2026-09-09 21:11（北京时间）。
+
+| 任务 | 实际终态与产物 | 模型响应数 | API tokens |
+| --- | --- | ---: | ---: |
+| task-02 / B2 | completed；真实 metadata → NDVI → map | 7 | 17,223 |
+| task-11 / B3 | completed；一次受控 threshold 故障 → Scientist 局部重新授权 → 复用 NDVI → mask / map / area | 11 | 55,169 |
+| task-13 / B2 | needs_clarification；询问植被健康具体采用什么指标，未调用工具 | 1 | 773 |
+
+三例均通过既有 v2 工程闭合评价；终态是 **2 completed + 1 clarification**，不是 100% 任务成功率。
+共 19 次响应，71,424 prompt + 1,741 completion = 73,165 tokens；各例 runtime wall time 合计 27.538 秒，
+不是含环境准备/归档的总工时。19 个响应均返回精确模型 ID、`finish_reason=stop`；没有 SDK 重试、
+批次失败或补跑。费用没有账单依据，保持 null。模型/渠道/配置不同，不与旧轮次直接作效率排名。
+
+这次仍是既有开发题的集成检查。task-11 的失败由 `d3-task-11-threshold-once` fixture 注入；
+trace 确认 NDVI 只执行一次，修订后阈值节点消费原 NDVI 产物。报告的 40.76% 限定为有效影像像元比例，
+没有证明阈值的科学最优性、行政区绿地覆盖率、规划质量提升或 checkpoint 的独立收益。
+
+## 实战暴露的问题与修复边界
+
+1. **已修复未来记录：工作流名称误判为结构变化。** 本轮原始 task-11 的 `structural_delta` 来自
+   `green_cover_workflow` 改名为 `green_cover_workflow_rev1`；task、输入、节点、参数和依赖完全一致。
+   `classify_graph_diff` 现仅排除顶层 `workflow_id`，保留可执行配置差异的判定；添加改名正例、
+   真实依赖变化反例及 runtime 集成回归。正确解释为 `local_reauthorization_only`。
+   原始 state / trace / evaluator / summary 一律保留原值，只在独立 `post_run_review/review.json` 追加解释。
+   未重跑 API，也未通过修改 evaluator 把结果改成通过。
+2. **已定位、延后修复：恢复分支标签不一致。** plan v2 记录 `branch_id=recovery`，动作沿用默认 `main`；
+   动作的 `implements` 引用仍能指向实际计划，但当前不支持分支隔离恢复主张。
+   下一次 trace 改动应统一动作/检查点的标签传播并覆盖 resume 兼容性；此处不扩大为并发分支系统。
+
+fresh-context 只读子智能体独立核对了 19 个响应、工具事实、NDVI 复用、改名误判与分支标签问题。
+其同步探针落在旧恢复 checkout，未作为 canonical 分支同步证据；运行包核验路径是 canonical URSA。
+修复后完整 `pytest ExpertsRS -q`：**141 passed，25 个既有 Rasterio PendingDeprecationWarning**。
+
+## 原始包保存与下一步
+
+原始 40 文件未改写；8 个登记产物均在各自运行目录内，当前 SHA 与记录一致。
+本地 ZIP 包含原始包、追加审查、包版本清单与校验索引；读取归档逐文件验证 SHA 和 CRC 通过。
+
+- 包：`ExpertsRS/results/flash_runtime_20260909/flash-runtime-20260909-baseline01.zip`
+- 大小：4,172,155 bytes。
+- SHA-256：`08974c458146c168c676b7db47d2fc9903653bc8fc6277aa9e97abce458ac9fa`。
+- raw、ZIP 和环境目录按仓库规则不进 Git；此索引入 Git 不等于原始包已完成异机备份。
+
+本轮补的是现有 runtime 在当前指定模型上的实战复核，**没有完成北京 classification-v1 的 live 接入**。
+后续仍按阶段计划推进：最小知识适配合同、一个模型真正组织的新领域任务，再准备同条件通用 agent 对照。
+本轮模型授权已明确；沿用现有 API 和有界小样可继续，不因形式化阶段入口重复请求同一授权。
+历史 laptop 包继续独立恢复及旧 SHA 核验，本包不能替代旧版本证据。

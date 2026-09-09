@@ -6,6 +6,8 @@
 S1 状态：已完成离线工程贯通、北京真实输入核验与图件复核；见 [阶段验收记录](audits/20260909_domain_toolchain_closeout.md)。
 下一里程碑及工业能力/面试校准见 [09-09 校准与计划](industrial_calibration_20260909.md)；
 通用 Agent 的同条件比较与整体系统参照分开准备，见 [对照准备建议](comparison_preparation_20260909.md)。
+现有 runtime 的真实模型历史及本日 DeepSeek V4 Flash 三例实测，见 [实验谱系与运行回执](experiment_lineage_20260909.md)。
+本日是旧开发题的 live 复核，未把 S1 北京离线成绩提升为 S3 领域 live 成绩；研究者已授权沿用现有 API 开展有界测试。
 
 ## 本阶段要交付什么
 
