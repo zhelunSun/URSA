@@ -4,6 +4,8 @@
 分支：`codex/ch3-domain-toolchain`；起点 `cedeb960f424f3d7547377818f803349700e00ac`。
 软件开发版本：`0.5.4.dev0`，不是新方法版本、论文效果接受或 v0.5.3 历史实验重跑。
 S1 状态：已完成离线工程贯通、北京真实输入核验与图件复核；见 [阶段验收记录](audits/20260909_domain_toolchain_closeout.md)。
+下一里程碑及工业能力/面试校准见 [09-09 校准与计划](industrial_calibration_20260909.md)；
+通用 Agent 的同条件比较与整体系统参照分开准备，见 [对照准备建议](comparison_preparation_20260909.md)。
 
 ## 本阶段要交付什么
 
