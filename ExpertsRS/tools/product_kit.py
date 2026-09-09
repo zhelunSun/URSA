@@ -495,7 +495,8 @@ def _figure_contract(data: dict[str, Any], aux: dict[str, Any], paths: dict[str,
             "axes": {
                 "map_x": {"label": "X coordinate (source CRS)", "unit": "source CRS", "scale": "linear"},
                 "map_y": {"label": "Y coordinate (source CRS)", "unit": "source CRS", "scale": "linear"},
-                "composition_x": {"label": "Valid classified pixel count", "unit": "pixel", "scale": "linear", "zero_baseline_expected": True},
+                "composition_x": {"label": "Valid classified pixel count", "unit": "pixel", "scale": "linear",
+                                  "zero_baseline_expected": True, "limits": [0, max(data["counts"].values()) * 1.30]},
             },
             "legend": "codes 0-7 with class names and current AOI counts; 255 nodata",
             "uncertainty": "No independent thematic reference or uncertainty intervals are available; none fabricated.",
@@ -562,6 +563,8 @@ def _plot_map(data: dict[str, Any], aux: dict[str, Any], paths: dict[str, Path])
     bars_axis.set_xlabel("Valid classified pixel count")
     bars_axis.set_title("B  Current AOI class counts", loc="left", fontsize=12, pad=12)
     bars_axis.bar_label(bars, labels=[f"{value:,}" for value in values], padding=3, fontsize=9)
+    # Full-product counts need room for comma-separated labels after the bars.
+    bars_axis.set_xlim(0, float(values.max()) * 1.30)
     bars_axis.spines[["top", "right"]].set_visible(False)
     bars_axis.xaxis.grid(alpha=0.16)
     bars_axis.set_axisbelow(True)
