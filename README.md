@@ -2,6 +2,13 @@
 
 > **Workspace note:** This checkout is the active local Chapter 1 prototype surface. The current thesis alignment intake is maintained in `docs/thesis/ch1_idea_release_intake_20260802.md`; the public URSA/ExpertsRS claims remain unchanged.
 
+> **Current thesis work (2026-09-09):** Use the canonical writable checkout at
+> `D:/Projects/phd-thesis/URSA` and the
+> [Chapter 1 system check](docs/thesis/ch1_evidence_system/audits/20260909_repository_system_check.md).
+> The current runtime is v0.5.3; older version notes below preserve its evolution.
+> Chapter roles and writing priorities follow the thesis control plane's current
+> `THESIS_STATE.md`, superseding the August intake where they differ.
+
 > Towards the Future of Remote Sensing Analysis with state-of-the-art AI technology.
 
 ---

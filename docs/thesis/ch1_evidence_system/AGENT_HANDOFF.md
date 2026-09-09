@@ -2,11 +2,12 @@
 
 ## Current execution authority
 
-Read `PLAN.md` first.  It freezes the remaining work into
-WP1--WP5 task packets and distinguishes the current offline method baseline from
-the later live-model evidence gate.  A workhorse chat must take exactly one
-packet; it must not redesign the thesis claim, comparison conditions, or
-legacy/new-system boundary.
+Read the dated current-status overlay in `PLAN.md` first, then
+`audits/20260909_repository_system_check.md`. The old WP1--WP5 packets are
+historical; do not redispatch completed v2 work. The canonical writable checkout
+is `D:/Projects/phd-thesis/URSA`; the `phd-research` checkout is recovery-only.
+Use the control plane's current execution plan for chapter roles and scheduling.
+Do not redesign the thesis claim, comparison conditions, or legacy/new-system boundary.
 
 ## Safe starting point
 
@@ -50,9 +51,11 @@ Read `UNIFIED_RUNTIME_REVIEW_PACKET.md` before proposing an architectural
 change.  Live model/API work is explicitly out of scope until the researcher
 opens the documented approval gate.
 
-The 2026-08-13 verified test baseline is 75 passing tests.  Do not repeat the
-older 43-test figure from narrative material without refreshing its upstream
-evidence surfaces.
+The 2026-09-09 canonical-checkout regression passed 121 tests. The older 75/43
+counts describe historical checkpoints. M1, D2 and the offline NDVI CLI also
+passed; no live model was called. Historical v0.5.3 live results remain frozen,
+but their indexed raw run packages were absent from both inspected checkouts.
+Recover and hash-check them before claiming present-day raw-evidence verification.
 
 For Chapter 2/3 integration, read `PLAN.md` section 10.  Provider repositories
 own their schemas and scientific/evaluation semantics; URSA owns only the

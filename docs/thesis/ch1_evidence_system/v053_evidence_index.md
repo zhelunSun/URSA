@@ -1,5 +1,11 @@
 # 第一章 v0.5.3 证据索引
 
+> **2026-09-09 可用性复核：**下表四个路径在正式 `D:/Projects/phd-thesis/URSA` 与恢复副本
+> `D:/Projects/phd-research/ch1-agent-workflow` 中均未找到。下方 SHA-256 是历史记录，本轮未重新校验。
+> `70abb92` 的“archive evidence package”提交保存的是文档摘要/索引，不包含 raw runs。
+> Git 与本地 LFS 对象通过检查不等于这些 ignored 运行包已备份；需从原运行机器或备份恢复后逐项验 hash。
+> 本轮新生成的离线诊断不能补作历史 live 证据。详见 [系统检查](audits/20260909_repository_system_check.md)。
+
 最终代码提交：`0efd090`（v0.5.3）。结果目录被 Git 忽略；以下相对路径、命令和 SHA-256 使其可定位、可复核。
 
 | 证据 | 路径 | SHA-256 | 复现入口 |
