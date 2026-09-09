@@ -182,6 +182,21 @@ class ScriptedDecisionProvider:
         }
 
     async def decide(self, role: str, state: dict[str, Any]) -> dict[str, Any]:
+        if state.get("domain_profile") == "classification-v1":
+            from .domain import scripted_plan
+            if role == "Scientist":
+                if state.get("phase") == "revision_required":
+                    return {"kind": "stop", "reason": "The domain engineering fixture does not prescribe recovery decisions."}
+                return scripted_plan(state["request"], state["product_year"])
+            if role == "Engineer":
+                eligible = state.get("eligible_node_ids", [])
+                return {"kind": "action", "node_id": eligible[0]} if eligible else {"kind": "handoff", "target": "Manager"}
+            if role == "Manager":
+                if state.get("phase") != "report":
+                    return {"kind": "handoff", "target": "Scientist"}
+                return {"kind": "report", "summary": "既有分类产品的空间分布与像元组成；离线工程贯通，不表示专题精度或生态效应。",
+                        "artifact_refs": [a["artifact_id"] for a in state["artifact_manifest"]],
+                        "deliverables": state["report_deliverables"]}
         operation = self._operation(" ".join([state["request"], *state.get("user_answers", [])]))
         phase = state.get("phase", "initial")
 

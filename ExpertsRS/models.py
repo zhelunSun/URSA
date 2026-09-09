@@ -100,7 +100,7 @@ class PlannedArtifactDecision(BaseModel):
 
     artifact_id: str = Field(pattern=r"^[a-z][a-z0-9_:-]*$")
     artifact_type: Literal[
-        "raster", "index_raster", "mask_raster", "metadata", "map", "report", "area_statistics",
+        "raster", "index_raster", "mask_raster", "metadata", "map", "report", "area_statistics", "aoi", "composition_table",
     ]
 
 
@@ -125,7 +125,7 @@ class TaskSpecDecision(BaseModel):
     task_id: str = Field(pattern=r"^[a-z][a-z0-9_:-]*$")
     goal: str = Field(min_length=1, max_length=2_000)
     expected_outputs: list[Literal[
-        "raster", "index_raster", "mask_raster", "metadata", "map", "report", "area_statistics",
+        "raster", "index_raster", "mask_raster", "metadata", "map", "report", "area_statistics", "aoi", "composition_table",
     ]] = Field(min_length=1)
     requested_outputs: list[str] = Field(default_factory=list)
     required_metrics: list[str] = Field(default_factory=list)
@@ -213,11 +213,23 @@ class ReportDecision(BaseModel):
     deliverables: list[ReportDeliverableDecision] = Field(default_factory=list)
 
 
+class InputResource(BaseModel):
+    """Caller-owned resource binding; paths and byte identities stay runtime-side."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    path: Path
+    artifact_type: Literal["raster", "aoi"]
+    sha256: str | None = Field(default=None, pattern=r"^[A-Fa-f0-9]{64}$")
+
+
 class RunRequest(BaseModel):
     """One natural-language remote-sensing request and its local raster inputs."""
 
     request: str = Field(min_length=1)
     data_paths: list[Path] = Field(default_factory=list)
+    input_resources: dict[str, InputResource] = Field(default_factory=dict)
+    domain_profile: Literal["legacy", "classification-v1"] = "legacy"
+    product_year: int = Field(default=2025, ge=1900, le=2100)
     output_dir: Path
     run_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
     budgets: RunBudgets = DEFAULT_RESEARCH_BUDGETS
@@ -234,6 +246,15 @@ class RunRequest(BaseModel):
 
     @model_validator(mode="after")
     def _provider_matches_execution_mode(self) -> "RunRequest":
+        if self.domain_profile == "classification-v1":
+            if self.execution_mode != ExecutionMode.SCRIPTED_OFFLINE:
+                raise ValueError("classification-v1 is an offline engineering profile; live admission is not implemented")
+            if self.data_paths or set(self.input_resources) != {"classification", "study_area"}:
+                raise ValueError("classification-v1 requires exactly classification and study_area resources, without data_paths")
+            if self.input_resources["classification"].artifact_type != "raster" or self.input_resources["study_area"].artifact_type != "aoi":
+                raise ValueError("Classification must be raster and study_area must be aoi")
+        elif self.input_resources:
+            raise ValueError("Explicit input_resources require classification-v1; legacy data_paths remain unchanged")
         if self.execution_mode == ExecutionMode.AUTOGEN_LIVE and self.provider is None:
             raise ValueError("autogen-live requires explicit provider configuration")
         if self.execution_mode == ExecutionMode.SCRIPTED_OFFLINE and self.provider is not None:

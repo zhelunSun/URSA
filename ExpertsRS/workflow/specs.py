@@ -15,6 +15,8 @@ class ArtifactType(str, Enum):
     MAP = "map"
     REPORT = "report"
     AREA_STATISTICS = "area_statistics"
+    AOI = "aoi"
+    COMPOSITION_TABLE = "composition_table"
 
 
 @dataclass(frozen=True)

@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "expertsrs"
-version = "0.5.3"
+version = "0.5.4.dev0"
 description = "Traceable research runtime for user-centric remote sensing analysis"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   "autogen-agentchat==0.7.5",
   "autogen-ext[openai]==0.7.5",
@@ -19,6 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+domain = ["shapely==2.1.1", "pyshp==2.3.1"]
 dev = [
   "coverage>=7,<8",
   "pytest>=8,<9",

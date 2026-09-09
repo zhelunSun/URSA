@@ -30,7 +30,7 @@ def _spec(
     )
 
 
-def build_operator_catalog() -> dict[str, OperatorSpec]:
+def build_operator_catalog(profile: str = "legacy") -> dict[str, OperatorSpec]:
     """Return versioned contracts for all public functions in ``tools.registry``."""
     source = {"file_path": (R,)}
     catalog = {
@@ -101,12 +101,23 @@ def build_operator_catalog() -> dict[str, OperatorSpec]:
         from ExpertsRS.tools.registry import get_all_tools, list_tools
     except ModuleNotFoundError:
         from tools.registry import get_all_tools, list_tools
-    registered = set(list_tools())
+    if profile == "classification-v1":
+        catalog.update({
+            "expertsrs.summarize_classification.v1": _spec(
+                "summarize_classification", {"file_path": (R,), "aoi_path": (ArtifactType.AOI,)},
+                ArtifactType.COMPOSITION_TABLE, preconditions=("file_exists",), default_config={"year": 2025},
+            ),
+            "expertsrs.plot_classification_map.v1": _spec(
+                "plot_classification_map", {"file_path": (R,), "aoi_path": (ArtifactType.AOI,), "composition_path": (ArtifactType.COMPOSITION_TABLE,)},
+                MAP, preconditions=("file_exists",), default_config={"year": 2025},
+            ),
+        })
+    registered = set(list_tools(profile))
     contracted = {operator.tool_name for operator in catalog.values()}
     if registered != contracted:
         raise RuntimeError(f"Tool contract drift: registry={registered ^ contracted}")
 
-    functions = {function.__name__: function for function in get_all_tools()}
+    functions = {function.__name__: function for function in get_all_tools(profile)}
     for operator in catalog.values():
         signature = inspect.signature(functions[operator.tool_name])
         actual = set(signature.parameters)

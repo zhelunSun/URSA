@@ -7,7 +7,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from .models import ExecutionMode, ProviderConfig, RunBudgets, RunRequest
+from .models import ExecutionMode, InputResource, ProviderConfig, RunBudgets, RunRequest
 from .provider import ProviderFailure
 from .system import ExpertsRSSystem
 
@@ -18,6 +18,10 @@ def _parser() -> argparse.ArgumentParser:
     run = commands.add_parser("run", help="Start a new non-overwriting run.")
     run.add_argument("--request", required=True, help="Natural-language remote-sensing request.")
     run.add_argument("--data", action="append", default=[], type=Path, help="Allowed local GeoTIFF path; repeat for multiple inputs.")
+    run.add_argument("--profile", choices=["legacy", "classification-v1"], default="legacy")
+    run.add_argument("--aoi", type=Path, help="Study-area shapefile for the classification-v1 profile.")
+    run.add_argument("--product-year", type=int, default=2025)
+    run.add_argument("--raster-sha256", help="Optional admitted classification byte identity.")
     run.add_argument("--output-dir", required=True, type=Path, help="Parent directory for immutable run directories.")
     run.add_argument("--run-id", help="Optional stable run identifier.")
     run.add_argument(
@@ -46,6 +50,10 @@ async def _main_async(args: argparse.Namespace) -> int:
     system = ExpertsRSSystem()
     try:
         if args.command == "run":
+            if args.profile == "classification-v1" and (len(args.data) != 1 or args.aoi is None):
+                raise ValueError("classification-v1 requires exactly one --data raster and --aoi shapefile")
+            if args.profile == "legacy" and (args.aoi is not None or args.raster_sha256 is not None):
+                raise ValueError("--aoi and --raster-sha256 require classification-v1")
             mode = ExecutionMode(args.execution_mode)
             if mode == ExecutionMode.AUTOGEN_LIVE and (not args.provider or not args.model):
                 raise ValueError("autogen-live requires --provider and --model")
@@ -58,7 +66,15 @@ async def _main_async(args: argparse.Namespace) -> int:
                 if mode == ExecutionMode.AUTOGEN_LIVE else None
             )
             result = await system.run(RunRequest(
-                request=args.request, data_paths=args.data, output_dir=args.output_dir, run_id=args.run_id,
+                request=args.request,
+                data_paths=args.data if args.profile == "legacy" else [],
+                input_resources=(
+                    {"classification": InputResource(path=args.data[0], artifact_type="raster", sha256=args.raster_sha256),
+                     "study_area": InputResource(path=args.aoi, artifact_type="aoi")}
+                    if args.profile == "classification-v1" else {}
+                ),
+                domain_profile=args.profile, product_year=args.product_year,
+                output_dir=args.output_dir, run_id=args.run_id,
                 execution_mode=mode, provider=provider,
                 budgets=RunBudgets(
                     max_model_turns=args.max_model_turns,

@@ -62,6 +62,20 @@ ExpertsRS is built based on [AutoGen](https://github.com/microsoft/autogen), and
 
 ### Unified research runtime
 
+The `codex/ch3-domain-toolchain` development branch adds an explicit **offline**
+`classification-v1` profile to the same runtime. Its stage boundary and checks
+are documented in [the domain toolchain stage](docs/thesis/ch1_evidence_system/domain_toolchain_stage.md).
+Install `.[dev,domain]` in an isolated environment (Python 3.11 or later).
+For an existing eight-class product (codes 0–7, nodata 255) and matching polygon AOI:
+
+```powershell
+python -m ExpertsRS run --profile classification-v1 --request "Describe the product composition and spatial distribution" `
+  --data <classification.tif> --aoi <study_area.shp> --product-year 2025 --output-dir ExpertsRS/results/domain
+```
+
+This profile uses scripted decisions and real local tools; it is not a live-model
+or scientific-effect experiment. The default legacy tool catalog remains 18 tools.
+
 The current authoritative research entry point is a single Python API and CLI,
 which accepts a natural-language request plus permitted local GeoTIFF input,
 returns a report/artifacts/trace bundle, and can pause for clarification and

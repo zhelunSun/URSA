@@ -10,6 +10,8 @@ __pycache__/
 venv/
 env/
 .venv/
+.venv-domain/
+.test_tmp-domain-requirements.txt
 
 # IDE
 .vscode/

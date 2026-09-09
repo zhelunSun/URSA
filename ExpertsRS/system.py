@@ -71,7 +71,7 @@ class LocalToolExecutor:
             if tool_name in self.injected_failure_ids:
                 failure["fixture_id"] = self.injected_failure_ids[tool_name]
             return failure
-        tool = get_tool_by_name(tool_name)
+        tool = get_tool_by_name(tool_name, "classification-v1" if tool_name in {"summarize_classification", "plot_classification_map"} else "legacy")
         if tool is None:
             return {
                 "success": False,
@@ -119,6 +119,33 @@ class ExpertsRSSystem:
         "calculate_area": ToolBinding(tool_name="calculate_area", required_artifact_types=("mask_raster",)),
     }
 
+    @staticmethod
+    def _file_hash(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _request_obligations(request):
+        if request.domain_profile == "classification-v1":
+            from .domain import obligations
+            return obligations()
+        return [item.to_dict() for item in derive_delivery_obligations(request.request)]
+
+    def _bindings(self, state):
+        if state.get("domain_profile") == "classification-v1":
+            from .domain import bindings
+            return bindings(state["product_year"])
+        return self.TOOL_BINDINGS
+
+    @staticmethod
+    def _input_paths(state):
+        if state.get("input_resources"):
+            return {key: value["path"] for key, value in state["input_resources"].items()}
+        return {"input_raster": state["data_paths"][0]} if state["data_paths"] else {}
+
     async def run(self, request: RunRequest) -> RunResult:
         if not self._provider_is_injected:
             self.provider = self._provider_for_request(request)
@@ -153,10 +180,35 @@ class ExpertsRSSystem:
 
     def _initial_state(self, request: RunRequest, run_id: str, run_dir: Path) -> dict[str, Any]:
         paths = [Path(path).resolve() for path in request.data_paths]
+        resources = {key: value.model_dump(mode="json") for key, value in request.input_resources.items()}
+        for resource in resources.values():
+            resource["path"] = str(Path(resource["path"]).resolve())
+            paths.append(Path(resource["path"]))
         allowed_roots = self.allowed_data_roots or tuple(path.parent for path in paths)
+        for resource in resources.values():
+            path = Path(resource["path"])
+            if not path.is_file() or not LocalPermissionPolicy._is_within(str(path), tuple(Path(p).resolve() for p in allowed_roots)):
+                raise ValueError("Input resource is missing or outside allowed data roots")
+            actual = self._file_hash(path)
+            if resource.get("sha256") and resource["sha256"].lower() != actual:
+                raise ValueError("Input resource hash does not match declared identity")
+            resource["sha256"] = actual
+            if resource["artifact_type"] == "aoi":
+                resource["components"] = {}
+                suffixes = (".shp", ".shx", ".dbf", ".prj")
+                if path.with_suffix(".cpg").exists():
+                    suffixes += (".cpg",)
+                for suffix in suffixes:
+                    component = path.with_suffix(suffix).resolve()
+                    if not component.is_file() or not LocalPermissionPolicy._is_within(str(component), tuple(Path(p).resolve() for p in allowed_roots)):
+                        raise ValueError("AOI component missing or outside allowed data roots")
+                    resource["components"][suffix] = self._file_hash(component)
         trace = WorkflowTrace(run_id)
         return {
-            "schema_version": 1,
+            "schema_version": 2 if resources else 1,
+            "domain_profile": request.domain_profile,
+            "product_year": request.product_year,
+            "input_resources": resources,
             "run_id": run_id,
             "run_dir": str(run_dir),
             "request": request.request,
@@ -175,7 +227,7 @@ class ExpertsRSSystem:
             "active_plan_id": None,
             "current_plan": None,
             "planned_graph": None,
-            "delivery_obligations": [item.to_dict() for item in derive_delivery_obligations(request.request)],
+            "delivery_obligations": self._request_obligations(request),
             "plan_history": [],
             "node_states": {},
             "workflow_artifact_records": {},
@@ -280,7 +332,7 @@ class ExpertsRSSystem:
             "user_answers": state["user_answers"],
             "input_data_available": bool(state["data_paths"]),
             "input_data_count": len(state["data_paths"]),
-            "available_tools": [binding.model_dump(mode="json") for binding in self.TOOL_BINDINGS.values()],
+            "available_tools": [binding.model_dump(mode="json") for binding in self._bindings(state).values()],
             "observations": [self._redact_observation(item) for item in state["observations"]],
             "artifact_manifest": [self._model_artifact_record(item) for item in state["artifacts"]],
             "current_plan": state.get("current_plan"),
@@ -290,6 +342,10 @@ class ExpertsRSSystem:
             "report_deliverables": self._report_deliverables(state),
             "remaining_tool_budget": budgets["max_tool_calls"] - state["tool_calls"],
         }
+        if state.get("domain_profile") == "classification-v1":
+            view.update({"domain_profile": state["domain_profile"], "product_year": state["product_year"],
+                         "input_resources": [{"artifact_id": key, "artifact_type": item["artifact_type"]}
+                                             for key, item in state["input_resources"].items()]})
         raw_decision = await self.provider.decide(role, view)
         self._record_provider_usage(state, raw_decision)
         try:
@@ -341,10 +397,14 @@ class ExpertsRSSystem:
 
     def _accept_plan(self, state: dict[str, Any], decision: dict[str, Any]) -> None:
         """Validate, hydrate and version a Scientist plan before execution."""
-        catalog = build_operator_catalog()
+        catalog = build_operator_catalog(state.get("domain_profile", "legacy"))
         task_payload = decision["task"]
         graph_payload = decision["workflow"]
-        input_paths = {"input_raster": state["data_paths"][0]} if state["data_paths"] else {}
+        input_paths = self._input_paths(state)
+        for item in graph_payload["input_artifacts"]:
+            actual = state.get("input_resources", {}).get(item["artifact_id"])
+            if actual and actual["artifact_type"] != item["artifact_type"]:
+                raise ValueError("Plan input type disagrees with caller-owned resource binding")
         task = hydrate_task(task_payload)
         graph = hydrate_workflow(graph_payload, catalog, input_paths)
         report = validate_workflow(task, graph, catalog)
@@ -352,8 +412,8 @@ class ExpertsRSSystem:
         unsafe_nodes = [
             node.node_id for node in graph.nodes
             if catalog.get(node.operator_id) is None
-            or catalog[node.operator_id].tool_name not in self.TOOL_BINDINGS
-            or node.config != self.TOOL_BINDINGS[catalog[node.operator_id].tool_name].safe_parameters
+            or catalog[node.operator_id].tool_name not in self._bindings(state)
+            or node.config != self._bindings(state)[catalog[node.operator_id].tool_name].safe_parameters
         ]
         if not report.valid or unsafe_nodes:
             details = report.to_dict()
@@ -440,8 +500,8 @@ class ExpertsRSSystem:
     def _hydrated_graph(self, state: dict[str, Any]) -> Any:
         if not state.get("planned_graph"):
             raise ValueError("No active planned workflow")
-        catalog = build_operator_catalog()
-        paths = {"input_raster": state["data_paths"][0]} if state["data_paths"] else {}
+        catalog = build_operator_catalog(state.get("domain_profile", "legacy"))
+        paths = self._input_paths(state)
         return hydrate_workflow(state["planned_graph"]["workflow"], catalog, paths)
 
     def _eligible_node_ids(self, state: dict[str, Any]) -> list[str]:
@@ -455,6 +515,9 @@ class ExpertsRSSystem:
 
     def _report_deliverables(self, state: dict[str, Any]) -> list[dict[str, Any]]:
         """Build a small, path-free factual view for the Manager report role."""
+        if state.get("domain_profile") == "classification-v1":
+            from .domain import deliverables
+            return deliverables(state)
         artifacts = state.get("artifacts", [])
         by_type: dict[str, list[dict[str, Any]]] = {}
         by_node: dict[str, list[dict[str, Any]]] = {}
@@ -507,9 +570,9 @@ class ExpertsRSSystem:
             return {"tool": None, "plan_node_id": node_id, "success": False, "message": "Engineer selected an unknown planned node.", "error_code": "unknown_plan_node"}
         if node_id not in self._eligible_node_ids(state):
             return {"tool": None, "plan_node_id": node_id, "success": False, "message": "Engineer selected a non-eligible planned node.", "error_code": "node_not_eligible"}
-        catalog = build_operator_catalog()
+        catalog = build_operator_catalog(state.get("domain_profile", "legacy"))
         tool_name = catalog[node.operator_id].tool_name
-        binding = self.TOOL_BINDINGS.get(tool_name)
+        binding = self._bindings(state).get(tool_name)
         if binding is None:
             return {"tool": tool_name, "success": False, "message": "Tool is not in the runtime-visible catalog.", "error_code": "tool_not_registered"}
         if state["tool_calls"] >= state["budgets"]["max_tool_calls"]:
@@ -517,13 +580,16 @@ class ExpertsRSSystem:
         role_calls = state.setdefault("role_tool_calls", {"Scientist": 0, "Engineer": 0})
         if role_calls["Engineer"] >= state["budgets"]["max_tool_calls_engineer"]:
             return {"tool": tool_name, "success": False, "message": "engineer_tool_budget_exhausted", "error_code": "budget_exhausted"}
-        planned_refs = [
-            state["workflow_artifact_records"].get(artifact_id)
-            for artifact_id in node.inputs.values() if artifact_id != "input_raster"
-        ]
-        if any(reference is None for reference in planned_refs):
-            return {"tool": tool_name, "plan_node_id": node_id, "success": False, "message": "Planned input artifact is unavailable.", "error_code": "missing_artifact"}
-        arguments, contract_error = self._tool_arguments(state, binding, [item for item in planned_refs if item], node.config)
+        if state.get("domain_profile") == "classification-v1":
+            arguments, contract_error = self._domain_arguments(state, node, catalog[node.operator_id])
+        else:
+            planned_refs = [
+                state["workflow_artifact_records"].get(artifact_id)
+                for artifact_id in node.inputs.values() if artifact_id != "input_raster"
+            ]
+            if any(reference is None for reference in planned_refs):
+                return {"tool": tool_name, "plan_node_id": node_id, "success": False, "message": "Planned input artifact is unavailable.", "error_code": "missing_artifact"}
+            arguments, contract_error = self._tool_arguments(state, binding, [item for item in planned_refs if item], node.config)
         if contract_error:
             return {"tool": tool_name, "success": False, "message": contract_error, "error_code": "unsafe_action_contract"}
         if arguments is None:
@@ -531,7 +597,10 @@ class ExpertsRSSystem:
         action_id = f"{state['run_id']}:action:{state['tool_calls'] + 1:02d}"
         effect = self._effect(tool_name)
         resource = self._resource_for_permission(tool_name, arguments, state, action_id)
-        policy = LocalPermissionPolicy(state["allowed_data_roots"], [Path(state["run_dir"]) / "artifacts"])
+        from .workflow.runtime import TOOL_EFFECTS
+        policy = LocalPermissionPolicy(state["allowed_data_roots"], [Path(state["run_dir"]) / "artifacts"],
+            tool_effects={**TOOL_EFFECTS, "summarize_classification": ToolEffect.WRITE_LOCAL_ARTIFACT,
+                          "plot_classification_map": ToolEffect.WRITE_LOCAL_ARTIFACT})
         permission = policy.evaluate(PermissionRequest(action_id, "Engineer", tool_name, effect, resource))
         trace = self._trace(state)
         trace.record_permission(PermissionRequest(action_id, "Engineer", tool_name, effect, resource), permission)
@@ -546,9 +615,16 @@ class ExpertsRSSystem:
             # Evaluation provenance is trace-only.  It is never placed in the
             # compact observation supplied to a decision provider.
             trace.record("evaluation_fixture_injected", {"tool_name": tool_name, "fixture_id": result["fixture_id"]}, actor="Evaluator")
+        try:
+            artifact = self._record_artifact(state, trace, action_id, tool_name, result, plan_node_id=node_id)
+        except (OSError, ValueError, TypeError) as error:
+            trace.record("artifact_rejected", {"tool_name": tool_name, "returned_success": bool(result.get("success")),
+                         "reason": type(error).__name__}, actor="Runtime")
+            result = {"success": False, "data": None, "message": "Tool output failed artifact existence, scope or integrity checks.",
+                      "error_code": "invalid_artifact"}
+            artifact = None
         payload = {"plan_node_id": node_id, **self._compact_result(tool_name, result)}
         trace.record_observation(f"{action_id}:observation", "Executor", action_id, bool(result.get("success")), payload)
-        artifact = self._record_artifact(state, trace, action_id, tool_name, result, plan_node_id=node_id)
         self._sync_trace(state)
         observation = {"tool": tool_name, "success": bool(result.get("success")), **payload}
         if artifact:
@@ -566,6 +642,37 @@ class ExpertsRSSystem:
             state["checkpoint_id"] = checkpoint.checkpoint_id
             self._sync_trace(state)
         return observation
+
+    def _domain_arguments(self, state, node, operator):
+        """Resolve exact named graph inputs; validate source and upstream identities."""
+        if set(node.inputs) != set(operator.input_types):
+            return None, "Domain tool inputs disagree with declared contract"
+        arguments = dict(node.config)
+        records = {a["artifact_id"]: a for a in state["artifacts"]}
+        try:
+            for parameter, logical_id in node.inputs.items():
+                source = state["input_resources"].get(logical_id)
+                if source:
+                    path = Path(source["path"])
+                    if not LocalPermissionPolicy._is_within(str(path), tuple(Path(p) for p in state["allowed_data_roots"])):
+                        return None, "Domain input is outside allowed read roots"
+                    if self._file_hash(path) != source["sha256"]:
+                        return None, "Domain input changed since request admission"
+                    for suffix, expected in source.get("components", {}).items():
+                        component = path.with_suffix(suffix).resolve()
+                        if not LocalPermissionPolicy._is_within(str(component), tuple(Path(p) for p in state["allowed_data_roots"])) or self._file_hash(component) != expected:
+                            return None, "AOI component changed since request admission"
+                else:
+                    record = records.get(state["workflow_artifact_records"].get(logical_id))
+                    if not record or record["artifact_type"] not in [a.value for a in operator.input_types[parameter]]:
+                        return None, "Domain upstream artifact is unavailable or incompatible"
+                    path = Path(record["uri"]).resolve()
+                    if not path.is_relative_to(Path(state["run_dir"]).resolve()) or self._file_hash(path) != record["metadata"].get("artifact_sha256"):
+                        return None, "Domain upstream artifact changed or leaves the run"
+                arguments[parameter] = str(path)
+        except OSError:
+            return None, "Domain input or upstream artifact is missing"
+        return arguments, None
 
     def _tool_arguments(
         self,
@@ -605,13 +712,15 @@ class ExpertsRSSystem:
     def _effect(tool_name: str) -> ToolEffect:
         from .workflow.runtime import TOOL_EFFECTS
 
+        if tool_name in {"summarize_classification", "plot_classification_map"}:
+            return ToolEffect.WRITE_LOCAL_ARTIFACT
         return TOOL_EFFECTS[tool_name]
 
     @staticmethod
     def _resource_for_permission(tool_name: str, arguments: dict[str, Any], state: dict[str, Any], action_id: str) -> str:
         if tool_name in {"read_raster_metadata"}:
             return str(arguments["file_path"])
-        if tool_name in {"calculate_ndvi", "plot_index_map", "apply_threshold", "plot_thematic_map"}:
+        if tool_name in {"calculate_ndvi", "plot_index_map", "apply_threshold", "plot_thematic_map", "summarize_classification", "plot_classification_map"}:
             return str(Path(state["run_dir"]) / "artifacts" / action_id.replace(":", "_"))
         return str(Path(state["run_dir"]) / "artifacts")
 
@@ -626,6 +735,8 @@ class ExpertsRSSystem:
         plan_node_id: str | None = None,
     ) -> ArtifactRecord | None:
         if not result.get("success") or not isinstance(result.get("data"), dict):
+            if result.get("success"):
+                raise ValueError("Successful tool must supply an artifact payload")
             return None
         artifact_type = {
             "read_raster_metadata": "metadata",
@@ -634,19 +745,40 @@ class ExpertsRSSystem:
             "plot_index_map": "map",
             "plot_thematic_map": "map",
             "calculate_area": "area_statistics",
+            "summarize_classification": "composition_table",
+            "plot_classification_map": "map",
         }.get(tool_name)
         if artifact_type is None:
-            return None
+            raise ValueError("Successful tool has no registered artifact type")
         uri = result["data"].get("output_path")
         if uri is None:
+            if artifact_type not in {"metadata", "area_statistics"}:
+                raise ValueError("File-producing tool returned no output path")
             uri = str(Path(state["run_dir"]) / "metadata" / f"{action_id.replace(':', '_')}.json")
             metadata_path = Path(uri)
             metadata_path.parent.mkdir(parents=True, exist_ok=True)
             metadata_path.write_text(json.dumps(result["data"], indent=2, default=str), encoding="utf-8")
+        path = Path(uri).resolve()
+        expected_root = (Path(state["run_dir"]) / "artifacts" / action_id.replace(":", "_")).resolve()
+        metadata_root = (Path(state["run_dir"]) / "metadata").resolve()
+        if not path.is_file() or not (path.is_relative_to(expected_root) or (artifact_type in {"metadata", "area_statistics"} and path.is_relative_to(metadata_root))):
+            raise ValueError("Artifact does not exist in this action's permitted output directory")
+        if path.stat().st_size == 0:
+            raise ValueError("Artifact is empty")
+        if artifact_type == "composition_table":
+            persisted = json.loads(path.read_text(encoding="utf-8"))
+            if persisted.get("artifact_type") != "classification_summary" or persisted.get("data") != result["data"]:
+                raise ValueError("Composition metadata disagrees with the persisted table")
+        for secondary in result["data"].get("secondary_outputs", []):
+            secondary_path = Path(secondary["path"]).resolve()
+            if not secondary_path.is_relative_to(expected_root) or not secondary_path.is_file() or secondary_path.stat().st_size == 0:
+                raise ValueError("Secondary artifact is missing or outside action directory")
+            secondary["sha256"] = self._file_hash(secondary_path)
         record = ArtifactRecord(
             artifact_id=f"{action_id}:{artifact_type}", artifact_type=artifact_type, uri=Path(uri),
             producer_action_id=action_id, producer_plan_node_id=plan_node_id,
-            metadata={key: value for key, value in result["data"].items() if key != "output_path"},
+            metadata={**{key: value for key, value in result["data"].items() if key != "output_path"},
+                      "artifact_sha256": self._file_hash(path)},
         )
         state["artifacts"].append(record.model_dump(mode="json"))
         trace.record_artifact(
@@ -721,6 +853,11 @@ class ExpertsRSSystem:
             json.dumps({
                 "run_id": state["run_id"],
                 "execution_mode": state["execution_mode"],
+                "schema_version": state["schema_version"],
+                "domain_profile": state.get("domain_profile", "legacy"),
+                "input_resource_identities": {key: {"artifact_type": value["artifact_type"], "sha256": value["sha256"],
+                                                    "components": value.get("components", {})}
+                                              for key, value in state.get("input_resources", {}).items()},
                 "provider": state.get("provider"),
             "budgets": state["budgets"],
             "capabilities": state["capabilities"],
@@ -758,6 +895,12 @@ class ExpertsRSSystem:
         return {"artifact_id": record["artifact_id"], "artifact_type": record["artifact_type"]}
 
     def _render_report(self, state: dict[str, Any], decision: dict[str, Any]) -> tuple[str, list[str]]:
+        for artifact in state["artifacts"]:
+            if self._file_hash(Path(artifact["uri"])) != artifact["metadata"].get("artifact_sha256"):
+                raise ValueError("Artifact changed before report delivery")
+            for secondary in artifact["metadata"].get("secondary_outputs", []):
+                if self._file_hash(Path(secondary["path"])) != secondary["sha256"]:
+                    raise ValueError("Secondary artifact changed before report delivery")
         artifacts_by_id = {item["artifact_id"]: item for item in state["artifacts"]}
         artifact_refs = decision["artifact_refs"]
         if len(set(artifact_refs)) != len(artifact_refs):
@@ -785,6 +928,8 @@ class ExpertsRSSystem:
                 raise ValueError("Report deliverable value is not supported by runtime facts")
             if candidate["scope"] != fact["scope"]:
                 raise ValueError("Report deliverable scope is not supported by runtime facts")
+            if set(candidate["artifact_refs"]) != set(fact["artifact_refs"]):
+                raise ValueError("Report deliverable does not reference its supporting artifacts")
         lines = [decision["summary"].strip(), "", "已验证制品："]
         lines.extend(f"- {artifacts_by_id[artifact_id]['artifact_type']} ({artifact_id})" for artifact_id in artifact_refs)
         if decision["deliverables"]:
@@ -839,6 +984,7 @@ class ExpertsRSSystem:
             "artifact_type": {
                 "read_raster_metadata": "metadata", "calculate_ndvi": "index_raster", "apply_threshold": "mask_raster",
                 "plot_index_map": "map", "plot_thematic_map": "map", "calculate_area": "area_statistics",
+                "summarize_classification": "composition_table", "plot_classification_map": "map",
             }.get(tool_name),
             "valid_pixels": data.get("valid_pixels"),
         }

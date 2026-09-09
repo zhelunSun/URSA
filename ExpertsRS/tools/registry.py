@@ -109,7 +109,7 @@ def _build_schema(name: str, func) -> dict:
     return schema
 
 
-def get_all_tools() -> list:
+def get_all_tools(profile: str = "legacy") -> list:
     """
     Return all tools as actual Python callables.
     Use this for function_map in AutoGen agents.
@@ -121,6 +121,11 @@ def get_all_tools() -> list:
                 func = getattr(module, name)
                 if callable(func):
                     tools.append(func)
+    if profile == "classification-v1":
+        from .product_kit import summarize_classification, plot_classification_map
+        tools.extend([summarize_classification, plot_classification_map])
+    elif profile != "legacy":
+        raise ValueError(f"Unknown tool profile: {profile}")
     return sorted(tools, key=lambda f: f.__name__)
 
 
@@ -139,17 +144,14 @@ def get_tool_schemas() -> list:
     return schemas
 
 
-def get_tool_by_name(name: str):
+def get_tool_by_name(name: str, profile: str = "legacy"):
     """Get a single tool by function name."""
-    for module in _TOOL_MODULES:
-        if hasattr(module, name):
-            return getattr(module, name)
-    return None
+    return next((tool for tool in get_all_tools(profile) if tool.__name__ == name), None)
 
 
-def list_tools() -> list[str]:
+def list_tools(profile: str = "legacy") -> list[str]:
     """Return the names of all available tools."""
-    return sorted(_TOOL_NAMES)
+    return sorted(tool.__name__ for tool in get_all_tools(profile))
 
 
 def print_tool_catalog():
