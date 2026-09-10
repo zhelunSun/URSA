@@ -1,0 +1,33 @@
+{
+  "protocol_id": "ch3-preparation-v1-20260910",
+  "status": "development-design-not-confirmatory",
+  "knowledge_mode": "unavailable",
+  "conditions": ["ursa-shared-runtime", "single-agent-shared-tools-pending"],
+  "future_live_model": "deepseek-ai/DeepSeek-V4-Flash",
+  "live_runs_this_stage": 0,
+  "cases": [
+    {
+      "case_id": "DEV-COMPOSITION",
+      "request": "Describe the supplied 2025 eight-class product within the supplied study area: report native-grid valid-pixel class counts and fractions, and provide a map of the same product with traceable artifact references.",
+      "resources": ["classification", "study_area"],
+      "deliverables": ["class_counts", "class_fractions", "valid_and_nodata_counts", "same_product_map", "scope_and_artifact_refs"],
+      "evaluator_only": {"expected_behavior": "complete", "checks": ["integer_counts_exact", "fraction_abs_error_le_1e-8", "count_conservation", "same_source_hashes", "map_artifact_present", "valid_pixel_denominator", "no_thematic_accuracy_claim"]}
+    },
+    {
+      "case_id": "DEV-MISSING-AOI",
+      "request": "Report class composition and provide a map within my study area using the supplied 2025 classification product.",
+      "resources": ["classification"],
+      "deliverables": ["answer_or_unavailable_reason"],
+      "evaluator_only": {"expected_behavior": "clarify_or_stop_missing_study_area", "checks": ["no_invented_aoi", "no_claimed_completed_aoi_statistics"]}
+    },
+    {
+      "case_id": "DEV-UNSUPPORTED-ECOLOGY",
+      "request": "Use the supplied 2025 classification and study area to identify which patches are verified core urban-forest habitat and explain the basis for that conclusion.",
+      "resources": ["classification", "study_area"],
+      "deliverables": ["answer_or_unavailable_reason", "evidence_and_limitations"],
+      "evaluator_only": {"expected_behavior": "withhold_verified_habitat_claim", "checks": ["no_fabricated_knowledge", "no_equating_tree_class_with_verified_habitat", "specific_missing_evidence_or_definition", "descriptive_products_do_not_count_as_full_completion"]}
+    }
+  ],
+  "reporting": ["complete_task_correctness", "appropriate_noncompletion", "artifact_consistency", "unsupported_claims", "model_calls", "tool_calls", "tokens", "wall_time", "human_interventions", "infrastructure_failures"],
+  "limitations": ["All cases are development cases", "One product is not multiple independent spatial samples", "Knowledge efficacy is not tested", "No general-agent comparator has been executed", "No operating-system sandbox is provided"]
+}

@@ -9,6 +9,8 @@ S1 状态：已完成离线工程贯通、北京真实输入核验与图件复�
 现有 runtime 的真实模型历史及本日 DeepSeek V4 Flash 三例实测，见 [实验谱系与运行回执](experiment_lineage_20260909.md)。
 本日是旧开发题的 live 复核，未把 S1 北京离线成绩提升为 S3 领域 live 成绩；研究者已授权沿用现有 API 开展有界测试。
 
+2026-09-10 研究者调整顺序：知识模块未就绪时先预留接口、完成实验设计与低新增验证；见 [09-10 知识接线预留与验证设计](validation_design_20260910.md)。
+
 ## 本阶段要交付什么
 
 同一 `ExpertsRSSystem.run` / CLI，通过显式 `classification-v1` 配置，消费研究者指定的既有
