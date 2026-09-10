@@ -30,7 +30,7 @@ def classify_provider_exception(error: Exception) -> ProviderFailure:
     return ProviderFailure("provider_response_error", f"Provider response failed validation: {type(error).__name__}.")
 
 
-def create_autogen_live_provider(config: ProviderConfig) -> AutoGenSelectorDecisionProvider:
+def create_model_client(config: ProviderConfig):
     """Construct exactly the requested provider or fail before any request.
 
     Credentials remain in process environment only.  This factory never falls
@@ -64,11 +64,15 @@ def create_autogen_live_provider(config: ProviderConfig) -> AutoGenSelectorDecis
                 "structured_output": True,
             },
         )
-        return AutoGenSelectorDecisionProvider.create(client, _role_instructions())
+        return client
     except ProviderFailure:
         raise
     except Exception as error:
         raise ProviderFailure("provider_initialization_failed", type(error).__name__) from error
+
+
+def create_autogen_live_provider(config: ProviderConfig, instructions=None) -> AutoGenSelectorDecisionProvider:
+    return AutoGenSelectorDecisionProvider.create(create_model_client(config), instructions or _role_instructions())
 
 
 def redacted_provider_base_url(config: ProviderConfig) -> str:

@@ -1007,6 +1007,8 @@ class ExpertsRSSystem:
         if request.execution_mode == ExecutionMode.SCRIPTED_OFFLINE:
             return ScriptedDecisionProvider()
         assert request.provider is not None  # enforced by RunRequest
+        if request.classification_admission:
+            raise ValueError("Use ClassificationComparisonSystem for the explicitly admitted K0 contract")
         return create_autogen_live_provider(request.provider)
 
     @staticmethod

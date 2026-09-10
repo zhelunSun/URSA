@@ -230,6 +230,7 @@ class RunRequest(BaseModel):
     data_paths: list[Path] = Field(default_factory=list)
     input_resources: dict[str, InputResource] = Field(default_factory=dict)
     domain_profile: Literal["legacy", "classification-v1"] = "legacy"
+    classification_admission: Literal["ch3-k0-dev-v1"] | None = None
     product_year: int = Field(default=2025, ge=1900, le=2100)
     output_dir: Path
     run_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
@@ -248,11 +249,12 @@ class RunRequest(BaseModel):
     @model_validator(mode="after")
     def _provider_matches_execution_mode(self) -> "RunRequest":
         if self.domain_profile == "classification-v1":
-            if self.execution_mode != ExecutionMode.SCRIPTED_OFFLINE:
-                raise ValueError("classification-v1 is an offline engineering profile; live admission is not implemented")
-            if self.data_paths or set(self.input_resources) != {"classification", "study_area"}:
+            if self.execution_mode != ExecutionMode.SCRIPTED_OFFLINE and self.classification_admission != "ch3-k0-dev-v1":
+                raise ValueError("classification-v1 is an offline engineering profile unless the explicit K0 development contract is selected")
+            valid_resources = ("classification" in self.input_resources and set(self.input_resources) <= {"classification", "study_area"}) if self.classification_admission else set(self.input_resources) == {"classification", "study_area"}
+            if self.data_paths or not valid_resources:
                 raise ValueError("classification-v1 requires exactly classification and study_area resources, without data_paths")
-            if self.input_resources["classification"].artifact_type != "raster" or self.input_resources["study_area"].artifact_type != "aoi":
+            if self.input_resources["classification"].artifact_type != "raster" or ("study_area" in self.input_resources and self.input_resources["study_area"].artifact_type != "aoi"):
                 raise ValueError("Classification must be raster and study_area must be aoi")
         elif self.input_resources:
             raise ValueError("Explicit input_resources require classification-v1; legacy data_paths remain unchanged")
