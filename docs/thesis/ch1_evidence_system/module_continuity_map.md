@@ -38,6 +38,8 @@ PPT/面试可使用 `URSA Harness` 作为升级阶段名，但必须同时说明
 
 ## 工程实现策略：有边界的插件化
 
+> 2026-09-10 实现状态补注：下表包含设计方向。实际已有 DecisionProvider 与知识协议（后者 unavailable）；ExecutionBackend、EventStore、ScientificConstraintProvider、TelemetrySink 及 SQLite/远程适配器尚未实现。运行时仍直接使用 LocalToolExecutor 和 JSON/JSONL。当前实际能力见 [面试与架构说明](research_agent_interview_20260910.md)。
+
 当前采用 **stable domain kernel + replaceable capability ports + external evaluation**，而不是把全部
 系统对象做成可替换插件。该策略借鉴 DeepSeek Harness/Cordis 的 capability seam、typed event、
 profile composition 和可替换 provider 思想，但保留研究系统必须稳定的事实与成功语义。
