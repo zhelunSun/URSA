@@ -5,6 +5,7 @@
 > `codex/ch3-domain-toolchain` 开发分支为 v0.5.4.dev0，阶段范围见 [领域工具链](domain_toolchain_stage.md)。
 > 北京离线产品链的完成情况和可复核证据见 [阶段验收](audits/20260909_domain_toolchain_closeout.md)。
 > 后续工作入口：[能力校准与下一里程碑](industrial_calibration_20260909.md)、[通用 Agent 比较准备](comparison_preparation_20260909.md)。
+> 六例 K0 开发实测已完成：[原始结果与负例](ch3_k0_results_20260910.md)。正常任务 G 交付、U 多余澄清；不把接线完成视为 URSA 领域端到端验收。
 > 当前推进顺序以 [09-10 知识接线预留与验证设计](validation_design_20260910.md) 为准：知识模块暂不接入，先做公共任务包、对照设计和无 API 准备检查。
 > 原型、升级与新领域链的实战证据分开定位，见 [实验谱系与当前 Flash 检查](experiment_lineage_20260909.md)。
 > 本轮代码、环境、实验可用性与后续操作见 [系统检查](audits/20260909_repository_system_check.md)。

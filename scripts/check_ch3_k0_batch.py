@@ -57,7 +57,8 @@ def evaluate(batch, reference_path):
                     m=maps[-1]["metadata"]
                     checks["map_same_counts"]=m["counts"]==data["counts"]
                     checks["map_same_sources"]=m["provenance"]["raster_sha256"]==data["provenance"]["raster_sha256"] and m["provenance"]["aoi_component_hashes"]==data["provenance"]["aoi_component_hashes"] and m["provenance"]["composition_sha256"]==table["metadata"]["artifact_sha256"]
-        rows.append({**episode,"case_id":case_id,"machine_checks":checks,"all_machine_checks_pass":all(checks.values()),
+        rows.append({**episode,"case_id":case_id,"machine_checks":checks,"product_checks_pass":all(checks.values()) if case_id == "K0-01" else None,
+            "transport_integrity_checks_pass":all(checks[k] for k in ("response_model_exact","all_responses_stop","artifact_hashes_valid")),
             "answer_for_content_review":answer,"content_review":"pending",
             "figure_review":"pending" if any(a["artifact_type"]=="map" for a in state["artifacts"]) else "not_applicable",
             "scope":"State alone does not establish appropriate noncompletion or scientific correctness"})
@@ -75,4 +76,4 @@ if __name__=="__main__":
     result=evaluate(args.batch,args.reference)
     with args.output.open("x",encoding="utf-8") as stream:
         json.dump(result,stream,ensure_ascii=False,indent=2)
-    print(json.dumps({"rows":len(result["rows"]),"machine_checks_pass":[r["episode_id"] for r in result["rows"] if r["all_machine_checks_pass"]],"content_review":"pending"}))
+    print(json.dumps({"rows":len(result["rows"]),"product_checks_pass":[r["episode_id"] for r in result["rows"] if r["product_checks_pass"] is True],"content_review":"pending"}))

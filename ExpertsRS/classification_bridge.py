@@ -128,6 +128,8 @@ def validate_final(state, refs, declared):
     if len(refs) != len(set(refs)) or set(refs) != actual:
         raise ValueError("Final references must match produced artifacts")
     facts = {d["deliverable_id"]:d for d in factual_deliverables(state)}
+    if not set(state.get("required_product_deliverables", [])) <= set(facts):
+        raise ValueError("Final omitted a publicly requested product")
     if len(declared) != len(facts) or {d.get("deliverable_id") for d in declared} != set(facts):
         raise ValueError("Final omitted or invented product deliverables")
     for item in declared:

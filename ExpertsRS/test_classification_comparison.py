@@ -103,3 +103,15 @@ def test_generic_loop_does_not_accept_malformed_final_or_exceed_budget(domain_re
 def test_adapter_keeps_existing_scheduler():
     assert ClassificationComparisonSystem._drive is ExpertsRSSystem._drive
     assert ClassificationComparisonSystem._execute_action is ExpertsRSSystem._execute_action
+
+
+def test_single_agent_cannot_finish_requested_products_with_empty_delivery(domain_request):
+    class EmptyFinal:
+        async def decide(self, role, view):
+            assert view["required_product_deliverables"] == ["class_composition", "classification_map"]
+            return {"kind":"final", "answer":"done", "artifact_refs":[], "deliverables":[],
+                    "_provider_usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+    state=asyncio.run(run_single(packet_for(domain_request),resources_for(domain_request),
+        domain_request.output_dir/"empty-final",EmptyFinal(),domain_request.budgets.model_dump()))
+    assert state["status"] == "failed" and not state["artifacts"]
+    assert state["decisions"][0]["answer"] == "done"

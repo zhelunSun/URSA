@@ -59,8 +59,13 @@ SINGLE_INSTRUCTIONS = COMMON_INSTRUCTIONS + (
 )
 
 
+def required_products(packet):
+    return ["class_composition", "classification_map"] if "class_counts" in packet["deliverables"] else []
+
+
 def shared_view(packet, state):
     return {"public_task":packet, "tool_contracts":tool_contracts(state["product_year"]),
+            "required_product_deliverables":required_products(packet),
             "knowledge_status":"unavailable", "available_artifacts":public_facts(state),
             "factual_deliverables":factual_deliverables(state)}
 
@@ -158,7 +163,8 @@ async def run_single(packet, resources, destination, provider, budgets, executor
     state = {"run_id":run_id,"run_dir":str(destination.resolve()),"product_year":packet["product_year"],
              "input_resources":resources,"allowed_data_roots":sorted({str(Path(r['path']).resolve().parent) for r in resources.values()}),
              "artifacts":[],"budgets":budgets,"tool_calls":0,"tool_events":[],"decisions":[],"observations":[],
-             "status":"running","answer":None,"model_calls":0,"total_tokens":0}
+             "status":"running","answer":None,"model_calls":0,"total_tokens":0,
+             "required_product_deliverables":required_products(packet)}
     start = time.monotonic()
     executor = executor or LocalToolExecutor()
 
