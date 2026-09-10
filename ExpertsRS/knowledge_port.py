@@ -67,4 +67,3 @@ def validate_exchange(request: KnowledgeRequest, response: KnowledgeResponse) ->
         raise ValueError("Knowledge response belongs to another request")
     if response.model_calls > request.max_model_calls or response.tool_calls > request.max_tool_calls:
         raise ValueError("Knowledge service exceeded its delegated call budget")
-
