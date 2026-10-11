@@ -26,6 +26,7 @@ from .models import (
 from .provider import ProviderFailure, create_autogen_live_provider, redacted_provider_base_url
 from .tools.output_context import use_output_directory
 from .tools.registry import get_tool_by_name
+from .workflow.obligations import ndvi_map_nodes
 from .workflow import (
     ArtifactSpec,
     ArtifactType,
@@ -242,6 +243,20 @@ class ExpertsRSSystem:
             "messages": [],
         }
 
+    @staticmethod
+    def _legacy_input_denial(state: dict[str, Any]) -> str | None:
+        """Check every declared legacy input before preflight can inspect it.
+
+        This application-level check is repeated before planning and execution;
+        it is not an atomic OS-level defence against concurrent file replacement.
+        """
+        if state.get("domain_profile", "legacy") != "legacy":
+            return None
+        roots = tuple(Path(root).resolve() for root in state["allowed_data_roots"])
+        if any(not LocalPermissionPolicy._is_within(path, roots) for path in state["data_paths"]):
+            return "Legacy input is outside allowed data roots."
+        return None
+
     async def _drive(self, state: dict[str, Any]) -> RunResult:
         elapsed = max(0.0, time.time() - float(state.get("started_at_unix", time.time())))
         remaining = state["budgets"]["max_wall_time_seconds"] - elapsed
@@ -254,6 +269,8 @@ class ExpertsRSSystem:
 
     async def _drive_within_wall_budget(self, state: dict[str, Any]) -> RunResult:
         try:
+            if denial := self._legacy_input_denial(state):
+                return self._stop(state, denial, actor="Runtime")
             await self._restore_provider_state(state)
             manager = await self._decide(state, "Manager")
             if manager["kind"] == "clarify":
@@ -397,6 +414,8 @@ class ExpertsRSSystem:
 
     def _accept_plan(self, state: dict[str, Any], decision: dict[str, Any]) -> None:
         """Validate, hydrate and version a Scientist plan before execution."""
+        if denial := self._legacy_input_denial(state):
+            raise ValueError(denial)
         catalog = build_operator_catalog(state.get("domain_profile", "legacy"))
         task_payload = decision["task"]
         graph_payload = decision["workflow"]
@@ -527,11 +546,25 @@ class ExpertsRSSystem:
         required = {item["obligation_id"] for item in state.get("delivery_obligations", [])}
         deliverables: list[dict[str, Any]] = []
         if "ndvi_map" in required:
-            maps = by_node.get("index_map", [])
-            if maps:
+            # Only active successful bindings with the correct producer/type
+            # support delivery; historical or merely named records do not.
+            evidence = []
+            try:
+                ndvi_node, map_node = ndvi_map_nodes((state.get("planned_graph") or {}).get("workflow", {}))
+            except ValueError:
+                pass
+            else:
+                records = {item["artifact_id"]: item for item in artifacts}
+                for node, expected_type in ((ndvi_node, "index_raster"), (map_node, "map")):
+                    record = records.get(state.get("workflow_artifact_records", {}).get(node["output_artifact_id"]))
+                    if (record and record.get("artifact_type") == expected_type and record.get("validated") is True
+                            and record.get("producer_plan_node_id") == node["node_id"]
+                            and state.get("node_states", {}).get(node["node_id"]) == "succeeded"):
+                        evidence.append(record)
+            if len(evidence) == 2:
                 deliverables.append({
                     "deliverable_id": "ndvi_map", "status": "delivered", "value": "NDVI map",
-                    "unit": None, "scope": "supplied raster extent", "artifact_refs": [maps[-1]["artifact_id"]],
+                    "unit": None, "scope": "supplied raster extent", "artifact_refs": [evidence[-1]["artifact_id"]],
                 })
         if "vegetation_coverage_map" in required:
             maps = by_node.get("thematic_map", [])
@@ -563,6 +596,8 @@ class ExpertsRSSystem:
         return deliverables
 
     def _execute_action(self, state: dict[str, Any], decision: dict[str, Any]) -> dict[str, Any]:
+        if denial := self._legacy_input_denial(state):
+            return {"tool": None, "success": False, "message": denial, "error_code": "permission_denied"}
         node_id = decision["node_id"]
         graph = self._hydrated_graph(state)
         node = graph.node_by_id(node_id)

@@ -67,6 +67,20 @@ def derive_delivery_obligations(request: str) -> list[DeliveryObligation]:
     return obligations
 
 
+def ndvi_map_nodes(workflow: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Identify the NDVI producer and its map by executable meaning, not labels."""
+    nodes = workflow.get("nodes", [])
+    maps = [node for node in nodes if node.get("node_id") == "index_map"]
+    if len(maps) != 1 or maps[0].get("operator_id") != "expertsrs.plot_index_map.v1":
+        raise ValueError("NDVI map requires a plot_index_map node, not a renamed artifact")
+    map_node = maps[0]
+    source_id = map_node.get("inputs", {}).get("file_path")
+    producers = [node for node in nodes if source_id and node.get("output_artifact_id") == source_id]
+    if len(producers) != 1 or producers[0].get("operator_id") != "expertsrs.calculate_ndvi.v1":
+        raise ValueError("NDVI map must consume the output of calculate_ndvi")
+    return producers[0], map_node
+
+
 def validate_plan_obligations(obligations: list[dict[str, Any]], task: dict[str, Any], workflow: dict[str, Any]) -> None:
     """Fail closed when the proposed TaskSpec/graph cannot satisfy an obligation."""
     requested = set(task.get("requested_outputs", []))
@@ -75,6 +89,8 @@ def validate_plan_obligations(obligations: list[dict[str, Any]], task: dict[str,
         obligation_id = obligation["obligation_id"]
         if obligation_id not in requested:
             raise ValueError(f"Scientist TaskSpec omitted runtime delivery obligation: {obligation_id}")
+        if obligation_id == "ndvi_map":
+            ndvi_map_nodes(workflow)
         for node_id in obligation.get("required_plan_node_ids", []):
             node = nodes.get(node_id)
             if node is None:
