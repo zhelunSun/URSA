@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .analysis_plan import AnalysisPlan
+
 
 class RunStatus(StrEnum):
     COMPLETED = "completed"
@@ -238,6 +240,7 @@ class RunRequest(BaseModel):
     capabilities: RuntimeCapabilities = RuntimeCapabilities()
     execution_mode: ExecutionMode = ExecutionMode.SCRIPTED_OFFLINE
     provider: ProviderConfig | None = None
+    analysis_plan: AnalysisPlan | None = None
 
     @field_validator("request")
     @classmethod
@@ -248,6 +251,8 @@ class RunRequest(BaseModel):
 
     @model_validator(mode="after")
     def _provider_matches_execution_mode(self) -> "RunRequest":
+        if self.analysis_plan is not None:
+            self.analysis_plan.admit_classification(self)
         if self.domain_profile == "classification-v1":
             if self.execution_mode != ExecutionMode.SCRIPTED_OFFLINE and self.classification_admission != "ch3-k0-dev-v1":
                 raise ValueError("classification-v1 is an offline engineering profile unless the explicit K0 development contract is selected")

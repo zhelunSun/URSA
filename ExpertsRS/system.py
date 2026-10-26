@@ -9,14 +9,18 @@ import hashlib
 import subprocess
 import time
 import uuid
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from .decisions import DecisionProvider, ScriptedDecisionProvider, parse_role_decision
+from .analysis_plan import AnalysisPlan
+from .events import atomic_json, read_events, run_directory, run_lease
 from .models import (
     ArtifactRecord,
     ExecutionMode,
+    ProviderConfig,
     RunRequest,
     RunResult,
     RunStatus,
@@ -152,23 +156,102 @@ class ExpertsRSSystem:
             self.provider = self._provider_for_request(request)
         run_id = request.run_id or f"run_{uuid.uuid4().hex[:12]}"
         run_dir = self._new_run_dir(request.output_dir, run_id)
-        state = self._initial_state(request, run_id, run_dir)
-        return await self._drive(state)
+        with run_lease(run_dir):
+            state = self._initial_state(request, run_id, run_dir)
+            if request.analysis_plan:
+                atomic_json(run_dir / "analysis_plan.json", request.analysis_plan.model_dump(mode="json"))
+            self._append_trace(state, "run_started", {
+                "execution_mode": state["execution_mode"], "domain_profile": state["domain_profile"],
+                "analysis_plan_sha256": state.get("analysis_plan_sha256"),
+            })
+            return await self._drive(state)
 
-    async def resume(self, run_id: str, answer: str, output_dir: str | Path) -> RunResult:
-        run_dir = Path(output_dir).resolve() / run_id
+    async def resume(self, run_id: str, answer: str, output_dir: str | Path,
+                     *, provider_config: ProviderConfig | None = None) -> RunResult:
+        if not answer.strip():
+            raise ValueError("Clarification answer must not be blank")
+        run_dir = run_directory(output_dir, run_id)
         state_path = run_dir / "state.json"
         if not state_path.is_file():
             raise FileNotFoundError(f"No resumable ExpertsRS run at {run_dir}")
+        with run_lease(run_dir):
+            return await self._resume_locked(run_id, answer, run_dir, provider_config)
+
+    async def _resume_locked(self, run_id: str, answer: str, run_dir: Path,
+                             provider_config: ProviderConfig | None) -> RunResult:
+        state_path = run_dir / "state.json"
         state = json.loads(state_path.read_text(encoding="utf-8"))
+        if state["run_id"] != run_id or Path(state["run_dir"]).resolve() != run_dir:
+            raise ValueError("Checkpoint identity does not match the requested run")
         if state["status"] != RunStatus.NEEDS_CLARIFICATION:
             raise ValueError(f"Run {run_id} is not waiting for clarification")
+        persisted = read_events(run_dir.parent, run_id)["events"]
+        if self._sanitize_for_persistence(persisted) != state["trace"]["events"]:
+            raise ValueError("Trace and clarification checkpoint disagree")
+        state["trace"]["events"] = persisted
+        state["_events_written"] = len(persisted)
+        self._validate_resume_inputs(state)
+        if not self._provider_is_injected:
+            if state.get("provider_restore_kind") == "injected":
+                raise ValueError("This run requires its caller-injected decision provider")
+            snapshot = state.get("request_snapshot")
+            if snapshot:
+                request = RunRequest.model_validate(snapshot)
+                if request.execution_mode == ExecutionMode.AUTOGEN_LIVE:
+                    config = provider_config or request.provider
+                    if self._provider_config_identity(config) != state.get("provider_config_identity"):
+                        raise ValueError("Resume requires the original provider configuration; custom environment names are not persisted")
+                    request = request.model_copy(update={"provider": config})
+                self.provider = self._provider_for_request(request)
+            elif state["execution_mode"] == ExecutionMode.SCRIPTED_OFFLINE:
+                self.provider = ScriptedDecisionProvider()
+            else:
+                raise ValueError("Legacy live checkpoint lacks provider configuration; inject its original provider")
         state.setdefault("user_answers", []).append(answer.strip())
+        state["questions"] = []
         state["status"] = "running"
         state["phase"] = "planning"
         state["started_at_unix"] = time.time()
         self._append_trace(state, "user_clarification_received", {"answer": answer.strip()}, actor="User")
         return await self._drive(state)
+
+    def _validate_resume_inputs(self, state: dict[str, Any]) -> None:
+        roots = self.allowed_data_roots or tuple(Path(p) for p in state["allowed_data_roots"])
+        original_roots = tuple(Path(p) for p in state["allowed_data_roots"])
+        for name, digest in state.get("resume_input_hashes", {}).items():
+            path = Path(name)
+            if (not LocalPermissionPolicy._is_within(str(path), roots)
+                    or not LocalPermissionPolicy._is_within(str(path), original_roots)
+                    or not path.is_file() or self._file_hash(path) != digest):
+                raise ValueError("Resume input identity or allowed roots changed")
+        if self.allowed_data_roots:
+            for name in state["data_paths"]:
+                if not LocalPermissionPolicy._is_within(name, roots):
+                    raise ValueError("Resume input is outside caller's allowed roots")
+        if state.get("analysis_plan"):
+            plan = AnalysisPlan.model_validate(state["analysis_plan"])
+            if plan.fingerprint() != state["analysis_plan_sha256"]:
+                raise ValueError("Frozen analysis plan identity changed")
+
+    @staticmethod
+    def events(run_id: str, output_dir: str | Path, *, after: int = 0) -> dict[str, Any]:
+        return read_events(output_dir, run_id, after=after)
+
+    @staticmethod
+    def _provider_config_identity(config: ProviderConfig | None) -> str | None:
+        if config is None:
+            return None
+        normalized = ProviderConfig.model_validate(config.model_dump())
+        return hashlib.sha256(normalized.model_dump_json().encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _request_snapshot(request: RunRequest) -> dict[str, Any]:
+        snapshot = request.model_dump(mode="json")
+        if snapshot.get("provider"):
+            # Existing export privacy contract excludes even credential variable names.
+            snapshot["provider"].pop("api_key_env", None)
+            snapshot["provider"].pop("base_url_env", None)
+        return snapshot
 
     def _new_run_dir(self, output_dir: Path, run_id: str) -> Path:
         root = Path(output_dir).resolve()
@@ -205,6 +288,13 @@ class ExpertsRSSystem:
                         raise ValueError("AOI component missing or outside allowed data roots")
                     resource["components"][suffix] = self._file_hash(component)
         trace = WorkflowTrace(run_id)
+        input_hashes = {}
+        for path in paths:
+            if path.is_file() and LocalPermissionPolicy._is_within(str(path), allowed_roots):
+                input_hashes[str(path)] = self._file_hash(path)
+        for resource in resources.values():
+            for suffix, digest in resource.get("components", {}).items():
+                input_hashes[str(Path(resource["path"]).with_suffix(suffix))] = digest
         return {
             "schema_version": 2 if resources else 1,
             "domain_profile": request.domain_profile,
@@ -219,6 +309,14 @@ class ExpertsRSSystem:
             "capabilities": request.capabilities.model_dump(),
             "execution_mode": request.execution_mode.value,
             "provider": self._provider_manifest(request),
+            "provider_restore_kind": ("injected" if self._provider_is_injected
+                                      and type(self.provider) is not ScriptedDecisionProvider else "builtin"),
+            "request_snapshot": self._request_snapshot(request),
+            "provider_config_identity": self._provider_config_identity(request.provider),
+            "resume_input_hashes": input_hashes,
+            "analysis_plan": request.analysis_plan.model_dump(mode="json") if request.analysis_plan else None,
+            "analysis_plan_sha256": request.analysis_plan.fingerprint() if request.analysis_plan else None,
+            "_events_written": 0,
             "status": "running",
             "phase": "initial",
             "user_answers": [],
@@ -363,6 +461,9 @@ class ExpertsRSSystem:
             view.update({"domain_profile": state["domain_profile"], "product_year": state["product_year"],
                          "input_resources": [{"artifact_id": key, "artifact_type": item["artifact_type"]}
                                              for key, item in state["input_resources"].items()]})
+        if state.get("analysis_plan"):
+            view["analysis_plan"] = state["analysis_plan"]
+            view["analysis_plan_sha256"] = state["analysis_plan_sha256"]
         raw_decision = await self.provider.decide(role, view)
         self._record_provider_usage(state, raw_decision)
         try:
@@ -418,6 +519,8 @@ class ExpertsRSSystem:
             raise ValueError(denial)
         catalog = build_operator_catalog(state.get("domain_profile", "legacy"))
         task_payload = decision["task"]
+        if state.get("analysis_plan"):
+            AnalysisPlan.model_validate(state["analysis_plan"]).validate_task(task_payload)
         graph_payload = decision["workflow"]
         input_paths = self._input_paths(state)
         for item in graph_payload["input_artifacts"]:
@@ -643,6 +746,7 @@ class ExpertsRSSystem:
             self._sync_trace(state)
             return {"tool": tool_name, "success": False, "message": permission.reason, "error_code": "permission_denied"}
         trace.record_action(action_id, "Engineer", tool_name, self._redact_arguments(arguments), state["active_plan_id"], permission.decision_id, plan_node_id=node_id)
+        self._sync_trace(state)  # Tool-start is visible before a blocking tool runs.
         state["tool_calls"] += 1
         role_calls["Engineer"] += 1
         result = self.executor.execute(tool_name, arguments, Path(state["run_dir"]) / "artifacts" / action_id.replace(":", "_"))
@@ -844,6 +948,12 @@ class ExpertsRSSystem:
             )
             return self._finish(state, report=None)
         state["status"] = RunStatus.PARTIAL if incomplete else RunStatus.COMPLETED
+        if state.get("analysis_plan"):
+            plan = AnalysisPlan.model_validate(state["analysis_plan"])
+            report += "\n\n分析方案范围：\n" + "\n".join(f"- {x}" for x in plan.limitations)
+            if plan.deferred_requirements:
+                state["status"] = RunStatus.PARTIAL
+                report += "\n\n原需求中尚未满足：\n" + "\n".join(f"- {x}" for x in plan.deferred_requirements)
         self._append_trace(state, "report_validated", {
             "artifact_refs": decision["artifact_refs"],
             "deliverable_ids": [item["deliverable_id"] for item in decision["deliverables"]],
@@ -874,11 +984,13 @@ class ExpertsRSSystem:
         run_dir = Path(state["run_dir"])
         trace = self._trace(state)
         trace_path = run_dir / "trace.jsonl"
-        trace_path.write_text("\n".join(json.dumps(event, ensure_ascii=False) for event in trace.events) + "\n", encoding="utf-8")
+        self._sync_trace(state)
         state["trace"] = trace.to_dict()
         persisted_state = self._sanitize_for_persistence(state)
-        (run_dir / "state.json").write_text(json.dumps(persisted_state, indent=2, ensure_ascii=False), encoding="utf-8")
-        (run_dir / "result.json").write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        atomic_json(run_dir / "state.json", persisted_state)
+        atomic_json(run_dir / "result.json", result.model_dump(mode="json"))
+        if state.get("analysis_plan"):
+            atomic_json(run_dir / "analysis_plan.json", state["analysis_plan"])
         (run_dir / "delivery_obligations.json").write_text(
             json.dumps({"view_type": "delivery_obligation_manifest", "run_id": state["run_id"],
                         "obligations": state.get("delivery_obligations", [])}, indent=2, ensure_ascii=False),
@@ -894,6 +1006,7 @@ class ExpertsRSSystem:
                                                     "components": value.get("components", {})}
                                               for key, value in state.get("input_resources", {}).items()},
                 "provider": state.get("provider"),
+                "analysis_plan_sha256": state.get("analysis_plan_sha256"),
             "budgets": state["budgets"],
             "capabilities": state["capabilities"],
             "actual_wall_time_seconds": round(max(0.0, time.time() - float(state["started_at_unix"])), 3),
@@ -1036,6 +1149,17 @@ class ExpertsRSSystem:
     def _sync_trace(state: dict[str, Any]) -> None:
         # Events are mutated in place, but assigning makes the invariant explicit.
         state["trace"] = {"run_id": state["run_id"], "events": state["trace"]["events"]}
+        if "run_dir" not in state:
+            return
+        events = state["trace"]["events"]
+        written = state.get("_events_written", 0)
+        if len(events) > written:
+            with (Path(state["run_dir"]) / "trace.jsonl").open("a", encoding="utf-8", newline="\n") as stream:
+                for event in events[written:]:
+                    stream.write(json.dumps(event, ensure_ascii=False) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            state["_events_written"] = len(events)
 
     @staticmethod
     def _provider_for_request(request: RunRequest) -> DecisionProvider:

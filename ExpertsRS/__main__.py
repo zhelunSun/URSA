@@ -43,12 +43,21 @@ def _parser() -> argparse.ArgumentParser:
     resume.add_argument("--run-id", required=True)
     resume.add_argument("--answer", required=True)
     resume.add_argument("--output-dir", required=True, type=Path)
+    resume.add_argument("--provider-config", type=Path,
+                        help="Original non-secret ProviderConfig JSON when custom credential variable names were used.")
+    events = commands.add_parser("events", help="Read committed run events after a sequence cursor.")
+    events.add_argument("--run-id", required=True)
+    events.add_argument("--output-dir", required=True, type=Path)
+    events.add_argument("--after", type=int, default=0)
     return parser
 
 
 async def _main_async(args: argparse.Namespace) -> int:
     system = ExpertsRSSystem()
     try:
+        if args.command == "events":
+            print(json.dumps(system.events(args.run_id, args.output_dir, after=args.after), ensure_ascii=False))
+            return 0
         if args.command == "run":
             if args.profile == "classification-v1" and (len(args.data) != 1 or args.aoi is None):
                 raise ValueError("classification-v1 requires exactly one --data raster and --aoi shapefile")
@@ -85,7 +94,8 @@ async def _main_async(args: argparse.Namespace) -> int:
                 ),
             ))
         else:
-            result = await system.resume(args.run_id, args.answer, args.output_dir)
+            config = ProviderConfig.model_validate_json(args.provider_config.read_text(encoding="utf-8")) if args.provider_config else None
+            result = await system.resume(args.run_id, args.answer, args.output_dir, provider_config=config)
     except (FileExistsError, FileNotFoundError, ProviderFailure, ValueError) as error:
         print(json.dumps({"status": "request_rejected", "message": str(error)}, ensure_ascii=False, indent=2))
         return 2
